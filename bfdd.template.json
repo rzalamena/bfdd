@@ -1,0 +1,20 @@
+{
+  "ipv4": [
+    {
+      "multihop": false,
+      "peer-address": "127.0.0.1",
+
+      "_local-address": "optional",
+      "local-address": "127.0.0.1",
+
+      "_local-interface": "optional",
+      "local-interface": "enp0s3",
+
+      "_vxlan": "optional",
+      "vxlan": "100",
+
+      "_vrf-name": "optional",
+      "vrf-name": "netns1"
+    }
+  ]
+}

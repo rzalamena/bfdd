@@ -1,0 +1,10 @@
+{
+  "ipv4": [
+    {
+      "multihop": false,
+      "peer-address": "127.0.0.1",
+      "local-address": "127.0.0.1",
+      "local-interface": "lo"
+    }
+  ]
+}
