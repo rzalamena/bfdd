@@ -934,12 +934,12 @@ strcpy(peer_addr, inet_ntoa(sin.sin_addr));
 		ptm_bfd_xmt_TO(bfd, 1);
 	} else if (oldXmtTime != bfd->xmt_TO) {
 		/* XXX add some skid to this as well */
-		ptm_bfd_start_xmt_timer(bfd);
+		ptm_bfd_start_xmt_timer(bfd, false);
 	}
 
 	if (!bfd->demand_mode) {
 		/* Restart detection timer (packet received) */
-		bfd_detecttimer_update(bfd);
+		bfd_recvtimer_update(bfd);
 	} else {
 		ERRLOG("Unsupport BFD mode detected");
 	}

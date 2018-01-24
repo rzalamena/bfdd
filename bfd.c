@@ -72,10 +72,10 @@ struct bfd_iface *iface_hash = NULL;
 struct timespec bfd_tt_epoch;
 uint64_t bfd_epoch_skid = 2000000; /* this is in NS */
 
-bfd_session *session_hash = NULL;      /* Find session from discriminator */
-bfd_session *peer_hash = NULL;	 /* Find session from peer address */
-bfd_session *local_peer_hash = NULL;   /* Find session from peer and local
-					* address */
+bfd_session *session_hash = NULL;    /* Find session from discriminator */
+bfd_session *peer_hash = NULL;       /* Find session from peer address */
+bfd_session *local_peer_hash = NULL; /* Find session from peer and local
+				      * address */
 
 
 /*
@@ -85,7 +85,9 @@ bfd_session *local_peer_hash = NULL;   /* Find session from peer and local
 uint32_t ptm_bfd_gen_ID(void);
 void ptm_bfd_echo_xmt_TO(bfd_session *bfd);
 void bfd_xmt_cb(evutil_socket_t sd, short ev, void *arg);
+void bfd_echo_xmt_cb(evutil_socket_t sd, short ev, void *arg);
 void bfd_recvtimer_cb(evutil_socket_t sd, short ev, void *arg);
+void bfd_echo_recvtimer_cb(evutil_socket_t sd, short ev, void *arg);
 void bfd_session_free(bfd_session *bs);
 bfd_session *bfd_session_new(int sd);
 bfd_session *bfd_find_disc(struct sockaddr_any *sa, uint32_t ldisc);
@@ -213,7 +215,7 @@ uint32_t ptm_bfd_gen_ID(void)
 	return (sessionID++);
 }
 
-void ptm_bfd_start_xmt_timer(bfd_session *bfd)
+void ptm_bfd_start_xmt_timer(bfd_session *bfd, bool is_echo)
 {
 	uint64_t jitter;
 	int maxpercent;
@@ -228,7 +230,11 @@ void ptm_bfd_start_xmt_timer(bfd_session *bfd)
 	maxpercent = (bfd->detect_mult == 1) ? 16 : 26;
 	jitter = (bfd->xmt_TO * (75 + (random() % maxpercent))) / 100;
 	/* XXX remove that division above */
-	bfd_xmttimer_update(bfd, jitter);
+
+	if (is_echo)
+		bfd_echo_xmttimer_update(bfd, jitter);
+	else
+		bfd_xmttimer_update(bfd, jitter);
 }
 
 void ptm_bfd_echo_xmt_TO(bfd_session *bfd)
@@ -237,7 +243,7 @@ void ptm_bfd_echo_xmt_TO(bfd_session *bfd)
 	ptm_bfd_echo_snd(bfd);
 
 	/* Restart the timer for next time */
-	ptm_bfd_start_xmt_timer(bfd);
+	ptm_bfd_start_xmt_timer(bfd, true);
 }
 
 void ptm_bfd_xmt_TO(bfd_session *bfd, int fbit)
@@ -246,7 +252,7 @@ void ptm_bfd_xmt_TO(bfd_session *bfd, int fbit)
 	ptm_bfd_snd(bfd, fbit);
 
 	/* Restart the timer for next time */
-	ptm_bfd_start_xmt_timer(bfd);
+	ptm_bfd_start_xmt_timer(bfd, false);
 }
 
 void ptm_bfd_echo_stop(bfd_session *bfd, int polling)
@@ -255,8 +261,8 @@ void ptm_bfd_echo_stop(bfd_session *bfd, int polling)
 	bfd->echo_detect_TO = 0;
 	BFD_UNSET_FLAG(bfd->flags, BFD_SESS_FLAG_ECHO_ACTIVE);
 
-	bfd_xmttimer_delete(bfd);
-	bfd_detecttimer_delete(bfd);
+	bfd_echo_xmttimer_delete(bfd);
+	bfd_echo_recvtimer_delete(bfd);
 
 	if (polling) {
 		bfd->polling = polling;
@@ -575,13 +581,18 @@ void bfd_xmt_cb(evutil_socket_t sd __attribute__((unused)),
 {
 	bfd_session *bs = arg;
 
-	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_ECHO_ACTIVE))
-		ptm_bfd_echo_xmt_TO(bs);
-	else
-		ptm_bfd_xmt_TO(bs, 0);
+	ptm_bfd_xmt_TO(bs, 0);
 }
 
-/* Was ptm_bfd_echo_detect_TO() */
+void bfd_echo_xmt_cb(evutil_socket_t sd __attribute__((unused)),
+		short ev __attribute__((unused)), void *arg)
+{
+	bfd_session *bs = arg;
+
+	ptm_bfd_echo_xmt_TO(bs);
+}
+
+/* Was ptm_bfd_detect_TO() */
 void bfd_recvtimer_cb(evutil_socket_t sd __attribute__((unused)),
 		      short ev __attribute__((unused)), void *arg)
 {
@@ -598,16 +609,40 @@ void bfd_recvtimer_cb(evutil_socket_t sd __attribute__((unused)),
 			" in state %d",
 			__FUNCTION__, bs->discrs.my_discr,
 			satostr(&bs->shop.peer), bs->ses_state);
-#if 0 /* TODO do this on non echo cases */
-		bfd_detecttimer_update(bs);
-#endif
+		bfd_recvtimer_update(bs);
 		break;
 
 	default:
-#if 0 /* TODO do this on non echo cases */
-		/* Second detect time expiration, zero remote discr (section 6.5.1) */
-		bfd->discrs.remote_discr = 0;
-#endif
+		/* Second detect time expiration, zero remote discr (section
+		 * 6.5.1) */
+		bs->discrs.remote_discr = 0;
+		break;
+	}
+
+	if (old_state != bs->ses_state) {
+		DLOG("BFD Sess %d [%s] Old State [%s] : New State [%s]",
+		     bs->discrs.my_discr, satostr(&bs->shop.peer),
+		     state_list[old_state].str, state_list[bs->ses_state].str);
+	}
+}
+
+/* Was ptm_bfd_echo_detect_TO() */
+void bfd_echo_recvtimer_cb(evutil_socket_t sd __attribute__((unused)),
+			   short ev __attribute__((unused)), void *arg)
+{
+	bfd_session *bs = arg;
+	uint8_t old_state;
+
+	old_state = bs->ses_state;
+
+	switch (bs->ses_state) {
+	case PTM_BFD_INIT:
+	case PTM_BFD_UP:
+		ptm_bfd_ses_dn(bs, BFD_DIAGDETECTTIME);
+		INFOLOG("%s Detect timeout on session 0x%x with peer %s,"
+			" in state %d",
+			__FUNCTION__, bs->discrs.my_discr,
+			satostr(&bs->shop.peer), bs->ses_state);
 		break;
 	}
 
@@ -635,9 +670,10 @@ bfd_session *bfd_session_new(int sd)
 	bs->slow_min_tx = BFD_DEF_SLOWTX;
 	bs->mh_ttl = BFD_DEF_MHOP_TTL;
 
-	// bfd_detecttimer_assign(bs, bfd_detecttimer_cb);
 	bfd_recvtimer_assign(bs, bfd_recvtimer_cb, sd);
+	bfd_echo_recvtimer_assign(bs, bfd_echo_recvtimer_cb, sd);
 	bfd_xmttimer_assign(bs, bfd_xmt_cb);
+	bfd_echo_xmttimer_assign(bs, bfd_echo_xmt_cb);
 
 	bs->sock = sd;
 
@@ -735,8 +771,7 @@ bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 	bfd->detect_TO = (bfd->detect_mult * bfd->slow_min_tx);
 
 	/* Use detect_TO first for slow detection, then use recvtimer_update. */
-	// bfd_recvtimer_update(bfd);
-	bfd_detecttimer_update(bfd);
+	bfd_recvtimer_update(bfd);
 
 	HASH_ADD(sh, session_hash, discrs.my_discr, sizeof(uint32_t), bfd);
 

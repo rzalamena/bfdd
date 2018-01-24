@@ -224,11 +224,12 @@ typedef struct ptm_bfd_session {
 	uint32_t slow_min_tx;
 	uint32_t up_min_tx;
 	uint64_t detect_TO;
+	struct event echo_recvtimer_ev;
 	struct event recvtimer_ev;
 	uint64_t xmt_TO;
-	struct timespec xmt_timer;
 	uint64_t echo_xmt_TO;
 	struct event xmttimer_ev;
+	struct event echo_xmttimer_ev;
 	uint64_t echo_detect_TO;
 
 	/* software object state */
@@ -440,14 +441,19 @@ void bfd_recv_cb(evutil_socket_t sd, short events, void *arg);
 typedef void (*bfd_ev_cb)(evutil_socket_t sd, short events, void *arg);
 
 void bfd_recvtimer_update(bfd_session *bs);
-void bfd_detecttimer_update(bfd_session *bs);
+void bfd_echo_recvtimer_update(bfd_session *bs);
 void bfd_xmttimer_update(bfd_session *bs, uint64_t jitter);
+void bfd_echo_xmttimer_update(bfd_session *bs, uint64_t jitter);
 
 void bfd_xmttimer_delete(bfd_session *bs);
-void bfd_detecttimer_delete(bfd_session *bs);
+void bfd_echo_xmttimer_delete(bfd_session *bs);
+void bfd_recvtimer_delete(bfd_session *bs);
+void bfd_echo_recvtimer_delete(bfd_session *bs);
 
 void bfd_recvtimer_assign(bfd_session *bs, bfd_ev_cb cb, int sd);
+void bfd_echo_recvtimer_assign(bfd_session *bs, bfd_ev_cb cb, int sd);
 void bfd_xmttimer_assign(bfd_session *bs, bfd_ev_cb cb);
+void bfd_echo_xmttimer_assign(bfd_session *bs, bfd_ev_cb cb);
 
 
 /*
@@ -476,7 +482,7 @@ void fetch_portname_from_ifindex(int ifindex, char *ifname, size_t ifnamelen);
 void ptm_bfd_echo_stop(bfd_session *bfd, int polling);
 void ptm_bfd_echo_start(bfd_session *bfd);
 void ptm_bfd_xmt_TO(bfd_session *bfd, int fbit);
-void ptm_bfd_start_xmt_timer(bfd_session *bfd);
+void ptm_bfd_start_xmt_timer(bfd_session *bfd, bool is_echo);
 int ptm_bfd_fetch_ifindex(const char *ifname);
 bfd_session *ptm_bfd_sess_find(bfd_pkt_t *cp, char *port_name,
 			       struct sockaddr_any *peer,
