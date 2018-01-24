@@ -393,6 +393,16 @@ bfd_session *bfd_find_shop(bfd_shop_key *k)
 
 	HASH_FIND(ph, peer_hash, k, sizeof(*k), bs);
 
+	/*
+	 * Since the local interface spec is optional, try searching the key
+	 * without
+	 * it as well.
+	 */
+	if (bs == NULL) {
+		memset(k->port_name, 0, sizeof(k->port_name));
+		HASH_FIND(ph, peer_hash, k, sizeof(*k), bs);
+	}
+
 	return bs;
 }
 

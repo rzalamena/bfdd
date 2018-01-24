@@ -1,10 +1,13 @@
 {
   "ipv4": [
     {
+      "_multihop": "optional defaults to false",
       "multihop": false,
+
+      "_peer-address": "mandatory",
       "peer-address": "127.0.0.1",
 
-      "_local-address": "optional",
+      "_local-address": "mandatory on multihop",
       "local-address": "127.0.0.1",
 
       "_local-interface": "optional",
@@ -16,5 +19,7 @@
       "_vrf-name": "optional",
       "vrf-name": "netns1"
     }
+  ],
+  "ipv6": [
   ]
 }
