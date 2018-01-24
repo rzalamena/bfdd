@@ -32,6 +32,7 @@ void usage(void)
 
 	fprintf(stderr,
 		"%s: [OPTIONS...]\n"
+		"\t-c - select a configuration file\n"
 		"\t-h - show this message\n",
 		__progname);
 
