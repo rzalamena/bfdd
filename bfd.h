@@ -33,9 +33,6 @@ struct sockaddr_any {
 
 #define ETHERNET_ADDRESS_LENGTH 6
 
-/* forward declarations */
-struct bfd_sess_parms_s;
-
 /**
  * List of type of listening socket Fds supported by BFD.
  * BFD_SHOP_FD: Single hop socket Fd
@@ -214,11 +211,9 @@ typedef struct ptm_bfd_session {
 
 	/* protocol state per RFC 5880*/
 	uint8_t ses_state;
-	uint8_t remote_ses_state; /* unused unless demand mode is in effect */
 	bfd_discrs_t discrs;
 	uint8_t local_diag;
 	uint8_t demand_mode;
-	uint8_t remote_demand_mode;
 	uint8_t detect_mult;
 	uint8_t remote_detect_mult;
 	uint8_t mh_ttl;
@@ -234,14 +229,9 @@ typedef struct ptm_bfd_session {
 	struct timespec xmt_timer;
 	uint64_t echo_xmt_TO;
 	struct event xmttimer_ev;
-	struct timespec echo_xmt_timer;
 	uint64_t echo_detect_TO;
-	struct timespec echo_detect_timer;
-	uint64_t send_evt_TO;
-	struct timespec send_evt_timer;
 
 	/* software object state */
-	uint8_t curr_poll_seq;
 	uint8_t polling;
 
 	/* This and the localDiscr are the keys to state info */
@@ -250,9 +240,6 @@ typedef struct ptm_bfd_session {
 		bfd_mhop_key mhop;
 	};
 	int sock;
-
-	/* sess parms that reference this session */
-	struct bfd_sess_parms_s *parm_hash;
 
 	/* fields needed for uthash integration */
 	UT_hash_handle sh; /* use session as key */
@@ -265,7 +252,6 @@ typedef struct ptm_bfd_session {
 	int ifindex;
 	uint8_t local_mac[ETHERNET_ADDRESS_LENGTH];
 	uint8_t peer_mac[ETHERNET_ADDRESS_LENGTH];
-	uint16_t src_udp_port;
 	uint16_t ip_id;
 
 	/* BFD session flags */
@@ -280,8 +266,6 @@ typedef struct ptm_bfd_session {
 	struct timeval downtime; /* last down time */
 } bfd_session;
 
-#define PTM_BFD_INVALID_VNID (-1)
-
 /**
  * List of IP address family supported by BFD session.
  * BFD_AFI_V4: Support only IPv4 peer sessions
@@ -294,61 +278,6 @@ typedef enum bfd_afi_e {
 	BFD_AFI_BOTH,
 } bfd_afi;
 
-typedef struct bfd_parms_list_s {
-	uint32_t up_min_tx;
-	uint32_t detect_mult;
-	bfd_timers_t timers;
-	uint32_t slow_min_tx;
-	uint32_t mh_ttl;
-	char src_ipaddr[INET6_ADDRSTRLEN + 1];
-	char dst_ipaddr[INET6_ADDRSTRLEN + 1];
-	char ifname[MAXNAMELEN + 1];
-	uint32_t vnid;
-	uint32_t enable_vnid;
-	uint32_t multi_hop;
-	/* ovs schema 1.3 */
-	uint8_t local_dst_mac[ETHERNET_ADDRESS_LENGTH];
-	char local_dst_ip[INET_ADDRSTRLEN + 1];
-	uint8_t remote_dst_mac[ETHERNET_ADDRESS_LENGTH];
-	char remote_dst_ip[INET_ADDRSTRLEN + 1];
-	uint32_t decay_min_rx;
-	uint32_t forwarding_if_rx;
-	uint32_t cpath_down;
-	uint32_t check_tnl_key;
-	bfd_afi afi;
-	uint32_t send_event;
-	uint32_t echo_support;
-	char vrf_name[MAXNAMELEN + 1];
-} bfd_parms_list;
-
-typedef struct parm_key_s {
-	char client_name[MAXNAMELEN + 1];
-	char port_vrf_name[MAXNAMELEN + 1]; /* port name for single hop and
-					     * vrf name for multi-hop */
-	char dst_ipaddr[INET6_ADDRSTRLEN + 1];
-} parm_key;
-
-typedef struct bfd_sess_parms_s {
-
-	char port_name[MAXNAMELEN + 1];
-	struct sockaddr_in *sin; /* for multi-hop use */
-	int ifindex;		 /* ifindex of the local interface */
-	uint8_t local_mac[ETHERNET_ADDRESS_LENGTH];
-	int vxlan_sock;
-	bfd_parms_list parms;
-	ptm_bfd_client_t client;
-	int pend;
-
-	/* TODO: event data */
-	// ptm_event_e pend_ev;
-
-	/* fields needed for uthash integration */
-	parm_key key;
-	UT_hash_handle ph;   /* use port name as key */
-	UT_hash_handle ciph; /* use client name+dst ip as key */
-	UT_hash_handle ch;   /* use client name as key (per bfd sess) */
-} bfd_sess_parms;
-
 typedef struct bfd_diag_str_list_s {
 	char *str;
 	int type;
@@ -358,16 +287,6 @@ typedef struct bfd_state_str_list_s {
 	char *str;
 	int type;
 } bfd_state_str_list;
-
-typedef struct _bfd_parms_key_s {
-	char *key;
-	int (*key_cb)(bfd_parms_list *, char *);
-} bfd_parms_key;
-
-typedef struct _bfd_status_ctxt_s {
-	bfd_session *bfd;
-	int set_env_var;
-} bfd_status_ctxt_t;
 
 struct bfd_vrf {
 	int vrf_id;
@@ -401,10 +320,6 @@ struct bfd_iface {
 #define BFD_DEF_REQ_MIN_ECHO (50 * MSEC_PER_SEC)
 #define BFD_DEF_SLOWTX (2000 * MSEC_PER_SEC)
 #define BFD_DEF_MHOP_TTL 5
-#define BFD_DEF_AFI BFD_AFI_V4
-#define BFD_DEF_SEND_EVT 0
-#define BFD_DEF_ECHO_SUPPORT 0
-#define BFD_MIN_REQ_MIN_ECHO (50 * MSEC_PER_SEC)
 #define BFD_PKT_LEN 24 /* Length of control packet */
 #define BFD_TTL_VAL 255
 #define BFD_RCV_TTL_VAL 1
@@ -412,13 +327,11 @@ struct bfd_iface {
 #define BFD_PKT_INFO_VAL 1
 #define BFD_IPV6_PKT_INFO_VAL 1
 #define BFD_IPV6_ONLY_VAL 1
-#define BFD_DOWNMINTX (300 * MSEC_PER_SEC)
 #define BFD_SRCPORTINIT 49142
 #define BFD_SRCPORTMAX 65536
 #define BFD_DEFDESTPORT 3784
 #define BFD_DEF_ECHO_PORT 3785
 #define BFD_DEF_MHOP_DEST_PORT 4784
-#define BFD_NULL_TIMER -1
 #define BFD_CMD_STRING_LEN (MAXNAMELEN + 50)
 #define BFD_BUFFER_LEN (BFD_CMD_STRING_LEN + MAXNAMELEN + 1)
 

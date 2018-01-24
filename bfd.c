@@ -76,8 +76,6 @@ bfd_session *session_hash = NULL;      /* Find session from discriminator */
 bfd_session *peer_hash = NULL;	 /* Find session from peer address */
 bfd_session *local_peer_hash = NULL;   /* Find session from peer and local
 					* address */
-bfd_sess_parms *topo_parm_hash = NULL; /* Find topo file based params */
-bfd_sess_parms *sess_parm_hash = NULL; /* Find sess params per dst ip */
 
 
 /*
@@ -311,7 +309,6 @@ void ptm_bfd_ses_dn(bfd_session *bfd, uint8_t diag)
 	bfd->discrs.remote_discr = 0;
 	bfd->ses_state = PTM_BFD_DOWN;
 	bfd->polling = 0;
-	bfd->curr_poll_seq = 0;
 	bfd->demand_mode = 0;
 	get_monotime(&bfd->downtime);
 

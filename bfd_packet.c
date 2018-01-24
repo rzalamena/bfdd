@@ -820,8 +820,6 @@ strcpy(peer_addr, inet_ntoa(sin.sin_addr));
 	}
 
 	bfd->discrs.remote_discr = ntohl(cp->discrs.my_discr);
-	bfd->remote_ses_state = bfd->ses_state;
-	bfd->remote_demand_mode = bfd->demand_mode;
 
 #if 0 /* TODO get defaults */
 	HASH_FIND(ch, bfd->parm_hash, CLIENT_NAME_DFLT,
