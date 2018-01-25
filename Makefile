@@ -1,5 +1,6 @@
 CC	=	gcc
-OBJS	=	bfdd.o bfd.o bfd_config.o bfd_event.o bfd_packet.o log.o util.o
+OBJS	=	bfdd.o bfd.o bfd_config.o bfd_event.o bfd_packet.o control.o log.o \
+				util.o
 BIN	=	bfdd
 
 CFLAGS	+=	-Wall -Wextra -Og -ggdb

@@ -18,6 +18,7 @@
 
 #include <event.h>
 
+#include "queue.h"
 #include "uthash.h"
 
 struct sockaddr_any {
@@ -337,6 +338,59 @@ struct bfd_iface {
 #define BFD_BUFFER_LEN (BFD_CMD_STRING_LEN + MAXNAMELEN + 1)
 
 /*
+ * control.c
+ *
+ * Daemon control code to speak with local consumers.
+ */
+
+/* Control protocol definitions begin */
+enum bc_msg_version {
+	BMV_VERSION_1 = 1,
+};
+
+enum bc_msg_type {
+	BMT_RESPONSE = 0,
+	BMT_REQUEST_ADD = 1,
+	BMT_REQUEST_DEL = 2,
+	BMT_NOTIFY = 3,
+};
+
+/* Notify flags to use with bcm_notify. */
+#define BCM_NOTIFY_ALL ((uint64_t)-1)
+#define BCM_NOTIFY_NONE 0
+
+struct bfd_control_msg {
+	uint32_t bcm_length;
+	uint16_t bcm_type;
+	uint8_t bcm_ver;
+	uint8_t bcm_zero;
+	uint8_t bcm_data[0];
+};
+/* Control protocol definitions end */
+
+struct bfd_control_socket {
+	TAILQ_ENTRY(bfd_control_socket) bcs_entry;
+
+	int bcs_sd;
+	struct event bcs_ev;
+
+	uint64_t bcs_notify;
+	enum bc_msg_version bcs_version;
+	enum bc_msg_type bcs_type;
+
+	/* Message buffering */
+	size_t bcs_bytesleft;
+	size_t bcs_bufpos;
+	union {
+		struct bfd_control_msg *bcs_bcm;
+		uint8_t *bcs_buf;
+	};
+};
+TAILQ_HEAD(bcslist, bfd_control_socket);
+
+int control_init(void);
+
+/*
  * bfdd.c
  *
  * Daemon specific code.
@@ -348,8 +402,13 @@ struct bfd_global {
 	int bg_mhop6;
 	int bg_echo;
 	int bg_vxlan;
-	struct event_base *bg_eb;
 	struct event bg_ev[6];
+
+	int bg_csock;
+	struct event bg_csockev;
+	struct bcslist bg_bcslist;
+
+	struct event_base *bg_eb;
 };
 extern struct bfd_global bglobal;
 
@@ -376,6 +435,8 @@ struct bfd_peer_cfg {
 };
 
 int parse_config(const char *);
+int config_request_add(const char *jsonstr);
+int config_request_del(const char *jsonstr);
 
 
 /*
@@ -476,6 +537,7 @@ extern bfd_state_str_list state_list[];
 
 bfd_session *bs_session_find(uint32_t discr);
 bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc);
+void ptm_bfd_ses_del(struct bfd_peer_cfg *bpc);
 void ptm_bfd_ses_dn(bfd_session *bfd, uint8_t diag);
 void ptm_bfd_ses_up(bfd_session *bfd);
 void fetch_portname_from_ifindex(int ifindex, char *ifname, size_t ifnamelen);

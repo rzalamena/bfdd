@@ -41,6 +41,8 @@ void usage(void)
 
 void bg_init(void)
 {
+	TAILQ_INIT(&bglobal.bg_bcslist);
+
 	bglobal.bg_shop = bp_udp_shop();
 	bglobal.bg_mhop = bp_udp_mhop();
 	bglobal.bg_shop6 = bp_udp6_shop();
@@ -81,6 +83,9 @@ int main(int argc, char *argv[])
 
 	log_init(1, BLOG_DEBUG);
 	bg_init();
+
+	/* Initialize control socket. */
+	control_init();
 
 	while ((opt = getopt(argc, argv, "c:")) != -1) {
 		switch (opt) {

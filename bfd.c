@@ -585,7 +585,7 @@ void bfd_xmt_cb(evutil_socket_t sd __attribute__((unused)),
 }
 
 void bfd_echo_xmt_cb(evutil_socket_t sd __attribute__((unused)),
-		short ev __attribute__((unused)), void *arg)
+		     short ev __attribute__((unused)), void *arg)
 {
 	bfd_session *bs = arg;
 
@@ -829,4 +829,44 @@ bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 	}
 
 	return bfd;
+}
+
+void ptm_bfd_ses_del(struct bfd_peer_cfg *bpc)
+{
+	bfd_session *bs;
+	bfd_mhop_key mhop;
+	bfd_shop_key shop;
+
+	/* check to see if this needs a new session */
+	if (bpc->bpc_mhop) {
+		memset(&mhop, 0, sizeof(mhop));
+		mhop.peer = bpc->bpc_peer;
+		mhop.local = bpc->bpc_local;
+		if (bpc->bpc_has_vrfname)
+			strxcpy(mhop.vrf_name, bpc->bpc_vrfname,
+				sizeof(mhop.vrf_name));
+
+		bs = bfd_find_mhop(&mhop);
+	} else {
+		shop.peer = bpc->bpc_peer;
+		memset(shop.port_name, 0, sizeof(shop.port_name));
+		if (!bpc->bpc_has_vxlan && bpc->bpc_has_localif)
+			strxcpy(shop.port_name, bpc->bpc_localif,
+				sizeof(shop.port_name));
+
+		bs = bfd_find_shop(&shop);
+	}
+
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
+		INFOLOG("Deleting session 0x%x with vrf %s peer %s local %s",
+			bs->discrs.my_discr,
+			bpc->bpc_has_vrfname ? bpc->bpc_vrfname : "N/A",
+			satostr(&bs->mhop.peer), satostr(&bs->mhop.local));
+	} else {
+		INFOLOG("Deleting session 0x%x with peer %s port %s\n",
+			bs->discrs.my_discr, satostr(&bs->shop.peer),
+			bs->shop.port_name);
+	}
+
+	bfd_session_free(bs);
 }

@@ -29,38 +29,49 @@
 	     json_object_iter_equal(&(joi), &(join)) == 0;                     \
 	     json_object_iter_next(&(joi)))
 
+typedef void (*bpc_handle)(struct bfd_peer_cfg *);
+
 
 /*
  * Prototypes
  */
-int parse_list(struct json_object *jo, bool ipv4);
+int parse_config_json(struct json_object *jo, bpc_handle h);
+int parse_list(struct json_object *jo, bool ipv4, bpc_handle h);
 int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc,
 		      bool ipv4);
+
+void config_add(struct bfd_peer_cfg *bpc);
+void config_del(struct bfd_peer_cfg *bpc);
 
 
 /*
  * Implementation
  */
-int parse_config(const char *fname)
+void config_add(struct bfd_peer_cfg *bpc)
 {
-	const char *key;
-	struct json_object *jo, *jo_val;
-	struct json_object_iterator joi, join;
-	const char *sval;
-	int error = 0;
+	ptm_bfd_sess_new(bpc);
+}
 
-	jo = json_object_from_file(fname);
-	if (jo == NULL)
-		log_fatal("failed to load configuration from %s\n", fname);
+void config_del(struct bfd_peer_cfg *bpc)
+{
+	ptm_bfd_ses_del(bpc);
+}
+
+int parse_config_json(struct json_object *jo, bpc_handle h)
+{
+	const char *key, *sval;
+	struct json_object *jo_val;
+	struct json_object_iterator joi, join;
+	int error = 0;
 
 	JSON_FOREACH (jo, joi, join) {
 		key = json_object_iter_peek_name(&joi);
 		jo_val = json_object_iter_peek_value(&joi);
 
 		if (strcmp(key, "ipv4") == 0) {
-			error += parse_list(jo_val, true);
+			error += parse_list(jo_val, true, h);
 		} else if (strcmp(key, "ipv6") == 0) {
-			error += parse_list(jo_val, false);
+			error += parse_list(jo_val, false, h);
 		} else {
 			sval = json_object_get_string(jo_val);
 			log_warning("%s:%d invalid configuration: %s\n",
@@ -72,7 +83,18 @@ int parse_config(const char *fname)
 	return error;
 }
 
-int parse_list(struct json_object *jo, bool ipv4)
+int parse_config(const char *fname)
+{
+	struct json_object *jo;
+
+	jo = json_object_from_file(fname);
+	if (jo == NULL)
+		log_fatal("failed to load configuration from %s\n", fname);
+
+	return parse_config_json(jo, config_add);
+}
+
+int parse_list(struct json_object *jo, bool ipv4, bpc_handle h)
 {
 	struct json_object *jo_val;
 	struct bfd_peer_cfg bpc;
@@ -80,13 +102,13 @@ int parse_list(struct json_object *jo, bool ipv4)
 	int error = 0, result;
 
 	allen = json_object_array_length(jo);
-	log_debug("ipv4 peers %d:\n", allen);
+	log_debug("ipv%s peers %d:\n", ipv4 ? "4" : "6", allen);
 	for (idx = 0; idx < allen; idx++) {
 		jo_val = json_object_array_get_idx(jo, idx);
 		result = parse_peer_config(jo_val, &bpc, ipv4);
 		error += result;
 		if (result == 0)
-			ptm_bfd_sess_new(&bpc);
+			h(&bpc);
 	}
 
 	return error;
@@ -158,4 +180,29 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc,
 	}
 
 	return error;
+}
+
+/*
+ * Control socket JSON parsing.
+ */
+int config_request_add(const char *jsonstr)
+{
+	struct json_object *jo;
+
+	jo = json_tokener_parse(jsonstr);
+	if (jo == NULL)
+		return -1;
+
+	return parse_config_json(jo, config_add);
+}
+
+int config_request_del(const char *jsonstr)
+{
+	struct json_object *jo;
+
+	jo = json_tokener_parse(jsonstr);
+	if (jo == NULL)
+		return -1;
+
+	return parse_config_json(jo, config_del);
 }
