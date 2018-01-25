@@ -686,7 +686,9 @@ void bfd_session_free(bfd_session *bs)
 		close(bs->sock);
 
 	event_del(&bs->recvtimer_ev);
+	event_del(&bs->echo_recvtimer_ev);
 	event_del(&bs->xmttimer_ev);
+	event_del(&bs->echo_xmttimer_ev);
 	free(bs);
 }
 
