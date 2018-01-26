@@ -46,7 +46,7 @@ int control_init(void)
 {
 	int sd;
 	struct sockaddr_un sun = {
-		.sun_family = AF_UNIX, .sun_path = "/var/run/bfdd.sock",
+		.sun_family = AF_UNIX, .sun_path = BFD_CONTROL_SOCK_PATH,
 	};
 
 	/* Remove previously created sockets. */

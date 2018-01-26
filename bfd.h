@@ -21,16 +21,7 @@
 #include "queue.h"
 #include "uthash.h"
 
-struct sockaddr_any {
-	union {
-		struct sockaddr_in sa_sin;
-		struct sockaddr_in6 sa_sin6;
-	};
-};
-
-#ifndef MAXNAMELEN
-#define MAXNAMELEN 32
-#endif
+#include "bfdctl.h"
 
 #define ETHERNET_ADDRESS_LENGTH 6
 
@@ -343,30 +334,7 @@ struct bfd_iface {
  * Daemon control code to speak with local consumers.
  */
 
-/* Control protocol definitions begin */
-enum bc_msg_version {
-	BMV_VERSION_1 = 1,
-};
-
-enum bc_msg_type {
-	BMT_RESPONSE = 0,
-	BMT_REQUEST_ADD = 1,
-	BMT_REQUEST_DEL = 2,
-	BMT_NOTIFY = 3,
-};
-
-/* Notify flags to use with bcm_notify. */
-#define BCM_NOTIFY_ALL ((uint64_t)-1)
-#define BCM_NOTIFY_NONE 0
-
-struct bfd_control_msg {
-	uint32_t bcm_length;
-	uint16_t bcm_type;
-	uint8_t bcm_ver;
-	uint8_t bcm_zero;
-	uint8_t bcm_data[0];
-};
-/* Control protocol definitions end */
+/* See 'bfdctrl.h' for client protocol definitions. */
 
 struct bfd_control_socket {
 	TAILQ_ENTRY(bfd_control_socket) bcs_entry;
@@ -418,22 +386,6 @@ extern struct bfd_global bglobal;
  *
  * Contains the code related with loading/reloading configuration.
  */
-struct bfd_peer_cfg {
-	bool bpc_mhop;
-	bool bpc_ipv4;
-	struct sockaddr_any bpc_peer;
-	struct sockaddr_any bpc_local;
-
-	bool bpc_has_vxlan;
-	unsigned int bpc_vxlan;
-
-	bool bpc_has_localif;
-	char bpc_localif[MAXNAMELEN + 1];
-
-	bool bpc_has_vrfname;
-	char bpc_vrfname[MAXNAMELEN + 1];
-};
-
 int parse_config(const char *);
 int config_request_add(const char *jsonstr);
 int config_request_del(const char *jsonstr);

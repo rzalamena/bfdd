@@ -2,6 +2,7 @@ CC	=	gcc
 OBJS	=	bfdd.o bfd.o bfd_config.o bfd_event.o bfd_packet.o control.o log.o \
 				util.o
 BIN	=	bfdd
+CTRLBIN	=	bfdctl
 
 CFLAGS	+=	-Wall -Wextra -Og -ggdb
 CFLAGS	+=	-Wstrict-prototypes -Wmissing-prototypes -Wmissing-declarations
@@ -14,7 +15,7 @@ LDFLAGS	+=	-levent -ljson-c
 
 .PHONY: all clean
 
-all: ${BIN}
+all: ${BIN} ${CTRLBIN}
 
 .c.o:
 	${CC} ${CFLAGS} $< -c -o $@
@@ -22,5 +23,8 @@ all: ${BIN}
 ${BIN}: ${OBJS}
 	${CC} ${CFLAGS} ${OBJS} ${LDFLAGS} -o ${BIN}
 
+${CTRLBIN}: bfdctl.c
+	${CC} ${CFLAGS} bfdctl.c -ljson-c -o $@
+
 clean:
-	rm -f -- ${OBJS} ${BIN}
+	rm -f -- ${OBJS} ${BIN} ${CTRLBIN}
