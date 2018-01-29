@@ -13,6 +13,7 @@
  * Rafael Zalamena <rzalamena@opensourcerouting.org>
  */
 
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -80,6 +81,9 @@ int main(int argc, char *argv[])
 {
 	const char *conf = BFDD_DEFAULT_CONFIG;
 	int opt;
+
+	/* Ignore SIGPIPE on write() failures. */
+	signal(SIGPIPE, SIG_IGN);
 
 	log_init(1, BLOG_DEBUG);
 	bg_init();
