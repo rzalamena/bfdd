@@ -141,6 +141,11 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (bmt == 0) {
+		fprintf(stderr, "you must specify an operation\n");
+		exit(1);
+	}
+
 	if (peer.sa_sin.sin_family == 0) {
 		fprintf(stderr, "you must specify a remote peer\n");
 		exit(1);
@@ -197,14 +202,20 @@ struct json_object *ctrl_new_json(void)
 	if (jo == NULL)
 		return NULL;
 
-	/* TODO free in case of error */
-
 	/* Create the IPv4 list: '{ 'ipv4': [] }' */
 	jon = json_object_new_array();
+	if (jon == NULL) {
+		json_object_put(jo);
+		return NULL;
+	}
 	json_object_object_add(jo, "ipv4", jon);
 
 	/* Create the IPv6 list: '{ 'ipv4': [], 'ipv6': [] }' */
 	jon = json_object_new_array();
+	if (jon == NULL) {
+		json_object_put(jo);
+		return NULL;
+	}
 	json_object_object_add(jo, "ipv6", jon);
 
 	return jo;
@@ -218,21 +229,35 @@ void ctrl_add_peer(struct json_object *msg, struct bfd_peer_cfg *bpc)
 	if (peer_jo == NULL)
 		return;
 
-	/* TODO handle object creation failures/free */
-
 	jo = json_object_new_boolean(bpc->bpc_mhop);
+	if (jo == NULL) {
+		json_object_put(peer_jo);
+		return;
+	}
 	json_object_object_add(peer_jo, "multihop", jo);
 
 	if (bpc->bpc_mhop) {
 		jo = json_object_new_string(satostr(&bpc->bpc_local));
+		if (jo == NULL) {
+			json_object_put(peer_jo);
+			return;
+		}
 		json_object_object_add(peer_jo, "local-address", jo);
 	}
 
 	jo = json_object_new_string(satostr(&bpc->bpc_peer));
+	if (jo == NULL) {
+		json_object_put(peer_jo);
+		return;
+	}
 	json_object_object_add(peer_jo, "peer-address", jo);
 
 	if (bpc->bpc_has_localif) {
 		jo = json_object_new_string(bpc->bpc_localif);
+		if (jo == NULL) {
+			json_object_put(peer_jo);
+			return;
+		}
 		json_object_object_add(peer_jo, "local-interface", jo);
 	}
 
