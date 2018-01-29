@@ -345,12 +345,20 @@ struct bfd_control_buffer {
 	};
 };
 
+struct bfd_control_queue {
+	TAILQ_ENTRY(bfd_control_queue) bcq_entry;
+
+	struct bfd_control_buffer bcq_bcb;
+};
+TAILQ_HEAD(bcqueue, bfd_control_queue);
+
 struct bfd_control_socket {
 	TAILQ_ENTRY(bfd_control_socket) bcs_entry;
 
 	int bcs_sd;
 	struct event bcs_ev;
 	struct event bcs_outev;
+	struct bcqueue bcs_bcqueue;
 
 	uint64_t bcs_notify;
 	enum bc_msg_version bcs_version;
@@ -358,7 +366,7 @@ struct bfd_control_socket {
 
 	/* Message buffering */
 	struct bfd_control_buffer bcs_bin;
-	struct bfd_control_buffer bcs_bout;
+	struct bfd_control_buffer *bcs_bout;
 };
 TAILQ_HEAD(bcslist, bfd_control_socket);
 
