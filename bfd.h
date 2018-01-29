@@ -336,27 +336,34 @@ struct bfd_iface {
 
 /* See 'bfdctrl.h' for client protocol definitions. */
 
+struct bfd_control_buffer {
+	size_t bcb_left;
+	size_t bcb_pos;
+	union {
+		struct bfd_control_msg *bcb_bcm;
+		uint8_t *bcb_buf;
+	};
+};
+
 struct bfd_control_socket {
 	TAILQ_ENTRY(bfd_control_socket) bcs_entry;
 
 	int bcs_sd;
 	struct event bcs_ev;
+	struct event bcs_outev;
 
 	uint64_t bcs_notify;
 	enum bc_msg_version bcs_version;
 	enum bc_msg_type bcs_type;
 
 	/* Message buffering */
-	size_t bcs_bytesleft;
-	size_t bcs_bufpos;
-	union {
-		struct bfd_control_msg *bcs_bcm;
-		uint8_t *bcs_buf;
-	};
+	struct bfd_control_buffer bcs_bin;
+	struct bfd_control_buffer bcs_bout;
 };
 TAILQ_HEAD(bcslist, bfd_control_socket);
 
 int control_init(void);
+
 
 /*
  * bfdd.c
@@ -389,6 +396,7 @@ extern struct bfd_global bglobal;
 int parse_config(const char *);
 int config_request_add(const char *jsonstr);
 int config_request_del(const char *jsonstr);
+char *config_response(const char *status, const char *error);
 
 
 /*

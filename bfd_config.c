@@ -15,6 +15,8 @@
 
 #include <json-c/json.h>
 
+#include <string.h>
+
 #include "bfd.h"
 
 /*
@@ -205,4 +207,41 @@ int config_request_del(const char *jsonstr)
 		return -1;
 
 	return parse_config_json(jo, config_del);
+}
+
+char *config_response(const char *status, const char *error)
+{
+	struct json_object *resp, *jo;
+	char *jsonstr;
+
+	resp = json_object_new_object();
+	if (resp == NULL)
+		return NULL;
+
+	/* Add 'status' response key. */
+	jo = json_object_new_string(status);
+	if (jo == NULL) {
+		json_object_put(resp);
+		return NULL;
+	}
+
+	json_object_object_add(resp, "status", jo);
+
+	/* Add 'error' response key. */
+	if (error != NULL) {
+		jo = json_object_new_string(error);
+		if (jo == NULL) {
+			json_object_put(resp);
+			return NULL;
+		}
+
+		json_object_object_add(resp, "error", jo);
+	}
+
+	/* Generate JSON response. */
+	jsonstr = strdup(
+		json_object_to_json_string_ext(resp, JSON_C_TO_STRING_PRETTY));
+	json_object_put(resp);
+
+	return jsonstr;
 }

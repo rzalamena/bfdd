@@ -34,7 +34,8 @@
 void usage(void);
 
 int control_init(void);
-void control_send(int sd, enum bc_msg_type bmt, const char *jsonstr);
+uint16_t control_send(int sd, enum bc_msg_type bmt, const char *jsonstr);
+int control_recv(int sd, uint16_t id);
 
 struct json_object *ctrl_new_json(void);
 void ctrl_add_peer(struct json_object *msg, struct bfd_peer_cfg *bpc);
@@ -72,6 +73,7 @@ int main(int argc, char *argv[])
 	enum bc_msg_type bmt = 0;
 	int csock;
 	int opt;
+	uint16_t cur_id;
 	bool mhop = false, verbose = false;
 	struct sockaddr_any local, peer;
 	struct bfd_peer_cfg bpc;
@@ -185,7 +187,13 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	control_send(csock, bmt, jsonstr);
+	cur_id = control_send(csock, bmt, jsonstr);
+	if (cur_id == 0) {
+		fprintf(stderr, "failed to send message\n");
+		exit(1);
+	}
+
+	control_recv(csock, cur_id);
 
 	return 0;
 }
@@ -280,7 +288,7 @@ int control_init(void)
 				  .sun_path = BFD_CONTROL_SOCK_PATH};
 	int sd;
 
-	sd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, PF_UNSPEC);
+	sd = socket(AF_UNIX, SOCK_STREAM, PF_UNSPEC);
 	if (sd == -1) {
 		fprintf(stderr, "%s: socket: %s\n", __FUNCTION__,
 			strerror(errno));
@@ -296,43 +304,150 @@ int control_init(void)
 	return sd;
 }
 
-void control_send(int sd, enum bc_msg_type bmt, const char *jsonstr)
+uint16_t control_send(int sd, enum bc_msg_type bmt, const char *jsonstr)
 {
+	static uint16_t id = 0;
 	ssize_t sent;
 	size_t total = strlen(jsonstr), cur = 0;
 	struct bfd_control_msg bcm = {
-		.bcm_length = total,
+		.bcm_length = htonl(total),
 		.bcm_type = bmt,
 		.bcm_ver = BMV_VERSION_1,
-		.bcm_zero = 0,
+		.bcm_id = htons(++id),
 	};
 
-	if ((sent = write(sd, &bcm, sizeof(bcm))) <= 0) {
-		if (sent == 0) {
-			fprintf(stderr, "%s: bfdd closed connection\n",
-				__FUNCTION__);
-			exit(1);
-		}
+	sent = write(sd, &bcm, sizeof(bcm));
+	if (sent == 0) {
+		fprintf(stderr, "%s: bfdd closed connection\n", __FUNCTION__);
+		return 0;
+	}
+	if (sent < 0) {
 		fprintf(stderr, "%s: write: %s\n", __FUNCTION__,
 			strerror(errno));
-		exit(1);
+		return 0;
 	}
 
 	while (total > 0) {
-		if ((sent = write(sd, &jsonstr[cur], total)) <= 0) {
-			if (sent == 0) {
-				fprintf(stderr, "%s: bfdd closed connection\n",
-					__FUNCTION__);
-				exit(1);
-			}
+		sent = write(sd, &jsonstr[cur], total);
+		if (sent == 0) {
+			fprintf(stderr, "%s: bfdd closed connection\n",
+				__FUNCTION__);
+			return 0;
+		}
+		if (sent < 0) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK
+			    || errno == EINTR)
+				continue;
+
 			fprintf(stderr, "%s: write: %s\n", __FUNCTION__,
 				strerror(errno));
-			exit(1);
+			return 0;
 		}
 
 		total -= sent;
 		cur += sent;
 	}
+
+	return id;
+}
+
+int control_recv(int sd, uint16_t id)
+{
+	size_t bufpos, bufremaining, plen;
+	ssize_t bread;
+	struct bfd_control_msg *bcm, bcmh;
+
+read_next:
+	bread = read(sd, &bcmh, sizeof(bcmh));
+	if (bread == 0) {
+		fprintf(stderr, "%s: bfdd closed connection\n", __FUNCTION__);
+		return -1;
+	}
+	if (bread < 0) {
+		fprintf(stderr, "%s: read: %s\n", __FUNCTION__,
+			strerror(errno));
+		return -1;
+	}
+
+	if (bcmh.bcm_ver != BMV_VERSION_1) {
+		fprintf(stderr, "%s: wrong protocol version (%d)\n",
+			__FUNCTION__, bcmh.bcm_ver);
+		return -1;
+	}
+
+	plen = ntohl(bcmh.bcm_length);
+	if (plen > 0) {
+		/* Allocate the space for NULL byte as well. */
+		bcm = malloc(sizeof(bcmh) + plen + 1);
+		if (bcm == NULL) {
+			fprintf(stderr, "%s: malloc: %s\n", __FUNCTION__,
+				strerror(errno));
+			return -1;
+		}
+
+		*bcm = bcmh;
+		bufremaining = plen;
+		bufpos = 0;
+	} else {
+		bcm = &bcmh;
+		bufremaining = 0;
+		bufpos = 0;
+	}
+
+	while (bufremaining > 0) {
+		bread = read(sd, &bcm->bcm_data[bufpos], bufremaining);
+		if (bread == 0) {
+			fprintf(stderr, "%s: bfdd closed connection\n",
+				__FUNCTION__);
+			return -1;
+		}
+		if (bread < 0) {
+			if (errno == EAGAIN || errno == EWOULDBLOCK
+			    || errno == EINTR)
+				continue;
+
+			fprintf(stderr, "%s: read: %s\n", __FUNCTION__,
+				strerror(errno));
+			return -1;
+		}
+
+		bufremaining -= bread;
+		bufpos += bread;
+	}
+
+	/* Terminate possible JSON string with NULL. */
+	if (bufpos > 0)
+		bcm->bcm_data[bufpos] = 0;
+
+	if (ntohs(bcm->bcm_id) != id) {
+		fprintf(stderr, "wrong message id (%d), waiting for more\n",
+			ntohs(bcm->bcm_id));
+		goto read_next;
+	}
+
+	switch (bcmh.bcm_type) {
+	case BMT_RESPONSE:
+	case BMT_NOTIFY:
+		printf("Response:\n%s\n", bcm->bcm_data);
+		break;
+
+	case BMT_REQUEST_ADD:
+	case BMT_REQUEST_DEL:
+	default:
+		fprintf(stderr, "%s: invalid response type (%d)\n",
+			__FUNCTION__, bcmh.bcm_type);
+		return -1;
+		break;
+	}
+
+	/*
+	 * Only try to free() memory that was allocated and not from
+	 * heap. Use plen to find if we allocated memory.
+	 */
+	if (plen > 0)
+		free(bcm);
+
+	return 0;
 }
 
 

@@ -710,8 +710,8 @@ bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 
 		l_bfd = bfd_find_mhop(&mhop);
 	} else {
+		memset(&shop, 0, sizeof(shop));
 		shop.peer = bpc->bpc_peer;
-		memset(shop.port_name, 0x00, sizeof(shop.port_name));
 		if (!bpc->bpc_has_vxlan && bpc->bpc_has_localif)
 			strxcpy(shop.port_name, bpc->bpc_localif,
 				sizeof(shop.port_name));

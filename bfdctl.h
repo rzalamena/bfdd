@@ -73,11 +73,24 @@ enum bc_msg_type {
 #define BCM_NOTIFY_ALL ((uint64_t)-1)
 #define BCM_NOTIFY_NONE 0
 
+/* Response 'status' definitions. */
+#define BCM_RESPONSE_OK "ok"
+#define BCM_RESPONSE_ERROR "error"
+
 struct bfd_control_msg {
+	/* Total length without the header. */
 	uint32_t bcm_length;
-	uint16_t bcm_type;
+	/*
+	 * Message request/response id.
+	 * All requests will have a correspondent response with the
+	 * same id.
+	 */
+	uint16_t bcm_id;
+	/* Message type. */
+	uint8_t bcm_type;
+	/* Message version. */
 	uint8_t bcm_ver;
-	uint8_t bcm_zero;
+	/* Message payload. */
 	uint8_t bcm_data[0];
 };
 

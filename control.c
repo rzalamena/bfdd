@@ -31,12 +31,18 @@ void control_accept(evutil_socket_t sd, short ev, void *arg);
 
 struct bfd_control_socket *control_new(int sd);
 void control_free(struct bfd_control_socket *bcs);
+void control_reset_buf(struct bfd_control_buffer *bcb);
 void control_read(evutil_socket_t sd, short ev, void *arg);
+void control_write(evutil_socket_t sd, short ev, void *arg);
 
-void control_handle_request_add(struct bfd_control_msg *bcm);
-void control_handle_request_del(struct bfd_control_msg *bcm);
+void control_handle_request_add(struct bfd_control_socket *bcs,
+				struct bfd_control_msg *bcm);
+void control_handle_request_del(struct bfd_control_socket *bcs,
+				struct bfd_control_msg *bcm);
 void control_handle_notify(struct bfd_control_socket *bcs,
 			   struct bfd_control_msg *bcm);
+void control_response(struct bfd_control_socket *bcs, uint16_t id,
+		      const char *status, const char *error);
 
 
 /*
@@ -107,11 +113,13 @@ struct bfd_control_socket *control_new(int sd)
 		return NULL;
 
 	/* Disable notifications by default. */
-	bcs->bcs_notify = false;
+	bcs->bcs_notify = 0;
 
 	bcs->bcs_sd = sd;
 	event_assign(&bcs->bcs_ev, bglobal.bg_eb, sd, EV_READ | EV_PERSIST,
 		     control_read, bcs);
+	event_assign(&bcs->bcs_outev, bglobal.bg_eb, sd, EV_WRITE | EV_PERSIST,
+		     control_write, bcs);
 	event_add(&bcs->bcs_ev, NULL);
 
 	TAILQ_INSERT_TAIL(&bglobal.bg_bcslist, bcs, bcs_entry);
@@ -121,21 +129,34 @@ struct bfd_control_socket *control_new(int sd)
 
 void control_free(struct bfd_control_socket *bcs)
 {
+	event_del(&bcs->bcs_outev);
 	event_del(&bcs->bcs_ev);
 	close(bcs->bcs_sd);
 
 	TAILQ_REMOVE(&bglobal.bg_bcslist, bcs, bcs_entry);
 
-	free(bcs->bcs_buf);
+	control_reset_buf(&bcs->bcs_bin);
+	control_reset_buf(&bcs->bcs_bout);
 	free(bcs);
+}
+
+void control_reset_buf(struct bfd_control_buffer *bcb)
+{
+	/* Get ride of old data. */
+	free(bcb->bcb_buf);
+	bcb->bcb_buf = NULL;
+	bcb->bcb_pos = 0;
+	bcb->bcb_left = 0;
 }
 
 void control_read(evutil_socket_t sd, short ev __attribute__((unused)),
 		  void *arg)
 {
 	struct bfd_control_socket *bcs = arg;
+	struct bfd_control_buffer *bcb = &bcs->bcs_bin;
 	struct bfd_control_msg bcm;
 	ssize_t bread;
+	size_t plen;
 
 	/*
 	 * Check if we have already downloaded message content, if so then skip
@@ -145,21 +166,26 @@ void control_read(evutil_socket_t sd, short ev __attribute__((unused)),
 	 * Otherwise download a new message header and allocate the necessary
 	 * memory.
 	 */
-	if (bcs->bcs_buf)
+	if (bcb->bcb_buf != NULL)
 		goto skip_header;
 
 	bread = read(sd, &bcm, sizeof(bcm));
-	if (bread <= 0) {
-		if (bread == -1)
-			log_warning("%s: read: %s\n", __FUNCTION__,
-				    strerror(errno));
+	if (bread == 0) {
+		control_free(bcs);
+		return;
+	}
+	if (bread < 0) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+			return;
 
+		log_warning("%s: read: %s\n", __FUNCTION__, strerror(errno));
 		control_free(bcs);
 		return;
 	}
 
 	/* Validate header fields. */
-	if (bcm.bcm_length < 2) {
+	plen = ntohl(bcm.bcm_length);
+	if (plen < 2) {
 		log_debug("%s: client closed due small message length: %d\n",
 			  __FUNCTION__, bcm.bcm_length);
 		control_free(bcs);
@@ -175,49 +201,54 @@ void control_read(evutil_socket_t sd, short ev __attribute__((unused)),
 
 	/* Prepare the buffer to load the message. */
 	bcs->bcs_version = bcm.bcm_ver;
-	bcs->bcs_type = ntohs(bcm.bcm_type);
-	bcs->bcs_bufpos = sizeof(bcm);
-	bcs->bcs_bytesleft = ntohl(bcm.bcm_length);
-	bcs->bcs_buf = malloc(sizeof(bcm) + bcs->bcs_bytesleft + 1);
-	if (bcs->bcs_buf == NULL) {
-		log_debug("%s: not enough memory for message size: %u\n",
-			  __FUNCTION__, bcs->bcs_bytesleft);
+	bcs->bcs_type = bcm.bcm_type;
+
+	bcb->bcb_pos = sizeof(bcm);
+	bcb->bcb_left = plen;
+	bcb->bcb_buf = malloc(sizeof(bcm) + bcb->bcb_left + 1);
+	if (bcb->bcb_buf == NULL) {
+		log_warning("%s: not enough memory for message size: %u\n",
+			  __FUNCTION__, bcb->bcb_left);
 		control_free(bcs);
 		return;
 	}
 
-	memcpy(bcs->bcs_buf, &bcm, sizeof(bcm));
+	memcpy(bcb->bcb_buf, &bcm, sizeof(bcm));
 
 	/* Terminate data string with NULL for later processing. */
-	bcs->bcs_buf[sizeof(bcm) + bcs->bcs_bytesleft] = 0;
+	bcb->bcb_buf[sizeof(bcm) + bcb->bcb_left] = 0;
 
 skip_header:
 	/* Download the remaining data of the message and process it. */
-	bread = read(sd, &bcs->bcs_buf[bcs->bcs_bufpos], bcs->bcs_bytesleft);
-	if (bread <= 0) {
-		if (bread == -1)
-			log_warning("%s: read: %s\n", __FUNCTION__,
-				    strerror(errno));
+	bread = read(sd, &bcb->bcb_buf[bcb->bcb_pos], bcb->bcb_left);
+	if (bread == 0) {
+		control_free(bcs);
+		return;
+	}
+	if (bread < 0) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+			return;
 
+		log_warning("%s: read: %s\n", __FUNCTION__, strerror(errno));
 		control_free(bcs);
 		return;
 	}
 
-	bcs->bcs_bufpos += bread;
-	bcs->bcs_bytesleft -= bread;
+	bcb->bcb_pos += bread;
+	bcb->bcb_left -= bread;
 	/* We need more data, return to wait more. */
-	if (bcs->bcs_bytesleft == 0)
+	if (bcb->bcb_left > 0)
 		return;
 
 	switch (bcm.bcm_type) {
 	case BMT_REQUEST_ADD:
-		control_handle_request_add(bcs->bcs_bcm);
+		control_handle_request_add(bcs, bcb->bcb_bcm);
 		break;
 	case BMT_REQUEST_DEL:
-		control_handle_request_del(bcs->bcs_bcm);
+		control_handle_request_del(bcs, bcb->bcb_bcm);
 		break;
 	case BMT_NOTIFY:
-		control_handle_notify(bcs, bcs->bcs_bcm);
+		control_handle_notify(bcs, bcb->bcb_bcm);
 		break;
 
 	default:
@@ -226,36 +257,112 @@ skip_header:
 		break;
 	}
 
-	/* Get ride of old data. */
-	free(bcs->bcs_buf);
-	bcs->bcs_buf = NULL;
-	bcs->bcs_bufpos = 0;
-	bcs->bcs_bytesleft = 0;
-
 	bcs->bcs_version = 0;
 	bcs->bcs_type = 0;
+	control_reset_buf(bcb);
+}
+
+void control_write(evutil_socket_t sd, short ev __attribute__((unused)),
+		   void *arg)
+{
+	struct bfd_control_socket *bcs = arg;
+	struct bfd_control_buffer *bcb = &bcs->bcs_bout;
+	ssize_t bwrite;
+
+	bwrite = write(sd, &bcb->bcb_buf[bcb->bcb_pos], bcb->bcb_left);
+	if (bwrite == 0) {
+		control_free(bcs);
+		return;
+	}
+	if (bwrite < 0) {
+		if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)
+			return;
+
+		log_warning("%s: write: %s\n", __FUNCTION__, strerror(errno));
+		control_free(bcs);
+		return;
+	}
+
+	bcb->bcb_pos += bwrite;
+	bcb->bcb_left -= bwrite;
+	if (bcb->bcb_left > 0)
+		return;
+
+	control_reset_buf(bcb);
+
+	event_add(&bcs->bcs_ev, NULL);
+	event_del(&bcs->bcs_outev);
 }
 
 
 /*
  * Message processing
  */
-void control_handle_request_add(struct bfd_control_msg *bcm)
+void control_handle_request_add(struct bfd_control_socket *bcs,
+				struct bfd_control_msg *bcm)
 {
 	const char *json = (const char *)bcm->bcm_data;
 
-	config_request_add(json);
+	if (config_request_add(json) == 0)
+		control_response(bcs, bcm->bcm_id, BCM_RESPONSE_OK, NULL);
+	else
+		control_response(bcs, bcm->bcm_id, BCM_RESPONSE_ERROR,
+				 "request add failed");
 }
 
-void control_handle_request_del(struct bfd_control_msg *bcm)
+void control_handle_request_del(struct bfd_control_socket *bcs,
+				struct bfd_control_msg *bcm)
 {
 	const char *json = (const char *)bcm->bcm_data;
 
-	config_request_del(json);
+	if (config_request_del(json) == 0)
+		control_response(bcs, bcm->bcm_id, BCM_RESPONSE_OK, NULL);
+	else
+		control_response(bcs, bcm->bcm_id, BCM_RESPONSE_ERROR,
+				 "request del failed");
 }
 
 void control_handle_notify(struct bfd_control_socket *bcs,
 			   struct bfd_control_msg *bcm)
 {
 	bcs->bcs_notify = *(uint64_t *)bcm->bcm_data;
+
+	control_response(bcs, bcm->bcm_id, BCM_RESPONSE_OK, NULL);
+}
+
+void control_response(struct bfd_control_socket *bcs, uint16_t id,
+		      const char *status, const char *error)
+{
+	struct bfd_control_buffer *bcb = &bcs->bcs_bout;
+	char *jsonstr;
+	size_t jsonstrlen;
+
+	/* Generate JSON response. */
+	jsonstr = config_response(status, error);
+	if (jsonstr == NULL) {
+		log_warning("%s: config_response: failed to get JSON str\n",
+				__FUNCTION__);
+		return;
+	}
+
+	/* Allocate data and answer. */
+	jsonstrlen = strlen(jsonstr);
+	bcb->bcb_buf = malloc(sizeof(struct bfd_control_msg) + jsonstrlen);
+	if (bcb->bcb_buf == NULL) {
+		log_warning("%s: malloc: %s\n", __FUNCTION__, strerror(errno));
+		free(jsonstr);
+		return;
+	}
+
+	bcb->bcb_bcm->bcm_length = htonl(jsonstrlen);
+	bcb->bcb_bcm->bcm_ver = BMV_VERSION_1;
+	bcb->bcb_bcm->bcm_type = BMT_RESPONSE;
+	bcb->bcb_bcm->bcm_id = id;
+	memcpy(bcb->bcb_bcm->bcm_data, jsonstr, jsonstrlen);
+	free(jsonstr);
+
+	bcb->bcb_left = sizeof(struct bfd_control_msg) + jsonstrlen;
+
+	event_add(&bcs->bcs_outev, NULL);
+	event_del(&bcs->bcs_ev);
 }
