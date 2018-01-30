@@ -452,3 +452,47 @@ void control_response(struct bfd_control_socket *bcs, uint16_t id,
 
 	control_queue_enqueue(bcs, bcm);
 }
+
+static void _control_notify(struct bfd_control_socket *bcs, bfd_session *bs)
+{
+	struct bfd_control_msg *bcm;
+	char *jsonstr;
+	size_t jsonstrlen;
+
+	/* Generate JSON response. */
+	jsonstr = config_notify(bs);
+	if (jsonstr == NULL) {
+		log_warning("%s: config_notify: failed to get JSON str\n",
+			    __FUNCTION__);
+		return;
+	}
+
+	/* Allocate data and answer. */
+	jsonstrlen = strlen(jsonstr);
+	bcm = malloc(sizeof(struct bfd_control_msg) + jsonstrlen);
+	if (bcm == NULL) {
+		log_warning("%s: malloc: %s\n", __FUNCTION__, strerror(errno));
+		free(jsonstr);
+		return;
+	}
+
+	bcm->bcm_length = htonl(jsonstrlen);
+	bcm->bcm_ver = BMV_VERSION_1;
+	bcm->bcm_type = BMT_NOTIFY;
+	bcm->bcm_id = htons(BCM_NOTIFY_ID);
+	memcpy(bcm->bcm_data, jsonstr, jsonstrlen);
+	free(jsonstr);
+
+	control_queue_enqueue(bcs, bcm);
+}
+
+int control_notify(bfd_session *bs)
+{
+	struct bfd_control_socket *bcs;
+
+	TAILQ_FOREACH (bcs, &bglobal.bg_bcslist, bcs_entry) {
+		_control_notify(bcs, bs);
+	}
+
+	return 0;
+}

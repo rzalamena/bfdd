@@ -77,6 +77,9 @@ enum bc_msg_type {
 #define BCM_RESPONSE_OK "ok"
 #define BCM_RESPONSE_ERROR "error"
 
+/* Notification special ID. */
+#define BCM_NOTIFY_ID 0
+
 struct bfd_control_msg {
 	/* Total length without the header. */
 	uint32_t bcm_length;

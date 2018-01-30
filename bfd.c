@@ -299,9 +299,7 @@ void ptm_bfd_ses_up(bfd_session *bfd)
 		ptm_bfd_snd(bfd, 0);
 	}
 
-#if 0 /* TODO notify listeners */
-    _signal_event(bfd, EVENT_ADD);
-#endif
+	control_notify(bfd);
 
 	INFOLOG("Session 0x%x up peer %s", bfd->discrs.my_discr,
 		satostr(&bfd->shop.peer));
@@ -320,11 +318,9 @@ void ptm_bfd_ses_dn(bfd_session *bfd, uint8_t diag)
 
 	ptm_bfd_snd(bfd, 0);
 
-#if 0 /* signal listener */
 	/* only signal clients when going from up->down state */
 	if (old_state == PTM_BFD_UP)
-		_signal_event(bfd, EVENT_DEL);
-#endif
+		control_notify(bfd);
 
 	INFOLOG("Session 0x%x down peer %s Rsn %s prev st %s",
 		bfd->discrs.my_discr, satostr(&bfd->shop.peer),

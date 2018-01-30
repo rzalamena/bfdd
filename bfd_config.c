@@ -45,6 +45,10 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc,
 void config_add(struct bfd_peer_cfg *bpc);
 void config_del(struct bfd_peer_cfg *bpc);
 
+int json_object_add_string(struct json_object *jo, const char *key,
+			   const char *str);
+int json_object_add_bool(struct json_object *jo, const char *key, bool boolean);
+int json_object_add_int(struct json_object *jo, const char *key, int64_t value);
 
 /*
  * Implementation
@@ -244,4 +248,116 @@ char *config_response(const char *status, const char *error)
 	json_object_put(resp);
 
 	return jsonstr;
+}
+
+char *config_notify(bfd_session *bs)
+{
+	struct json_object *resp;
+	char *jsonstr;
+
+	resp = json_object_new_object();
+	if (resp == NULL)
+		return NULL;
+
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
+		if (json_object_add_bool(resp, "multihop", true) == -1)
+			return NULL;
+		if (json_object_add_string(resp, "peer",
+					   satostr(&bs->mhop.peer))
+		    == -1)
+			return NULL;
+		if (json_object_add_string(resp, "local",
+					   satostr(&bs->mhop.local))
+		    == -1)
+			return NULL;
+	} else {
+		if (json_object_add_bool(resp, "multihop", false) == -1)
+			return NULL;
+		if (json_object_add_string(resp, "peer",
+					   satostr(&bs->shop.peer))
+		    == -1)
+			return NULL;
+	}
+
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_IPV6)) {
+		json_object_add_bool(resp, "ipv6", true);
+	} else {
+		json_object_add_bool(resp, "ipv6", false);
+	}
+
+	json_object_add_int(resp, "id", bs->discrs.my_discr);
+	json_object_add_int(resp, "remote-id", bs->discrs.my_discr);
+
+	switch (bs->ses_state) {
+	case PTM_BFD_UP:
+		json_object_add_string(resp, "state", "up");
+		break;
+	case PTM_BFD_ADM_DOWN:
+		json_object_add_string(resp, "state", "adm-down");
+		break;
+	case PTM_BFD_DOWN:
+		json_object_add_string(resp, "state", "down");
+		break;
+	case PTM_BFD_INIT:
+		json_object_add_string(resp, "state", "init");
+		break;
+
+	default:
+		json_object_add_string(resp, "state", "unknown");
+		break;
+	}
+
+	/* Generate JSON response. */
+	jsonstr = strdup(
+		json_object_to_json_string_ext(resp, JSON_C_TO_STRING_PRETTY));
+	json_object_put(resp);
+
+	return jsonstr;
+}
+
+
+/*
+ * JSON helper functions
+ */
+int json_object_add_string(struct json_object *jo, const char *key,
+			   const char *str)
+{
+	struct json_object *jon;
+
+	jon = json_object_new_string(str);
+	if (jon == NULL) {
+		json_object_put(jon);
+		return -1;
+	}
+
+	json_object_object_add(jo, key, jon);
+	return 0;
+}
+
+int json_object_add_bool(struct json_object *jo, const char *key, bool boolean)
+{
+	struct json_object *jon;
+
+	jon = json_object_new_boolean(boolean);
+	if (jon == NULL) {
+		json_object_put(jon);
+		return -1;
+	}
+
+	json_object_object_add(jo, key, jon);
+	return 0;
+}
+
+int json_object_add_int(struct json_object *jo, const char *key, int64_t value)
+{
+	struct json_object *jon;
+
+	jon = json_object_new_int64(value);
+	if (jon == NULL) {
+		json_object_put(jon);
+		return -1;
+	}
+
+	json_object_object_add(jo, key, jon);
+	return 0;
 }

@@ -35,11 +35,14 @@ void usage(void);
 
 int control_init(void);
 uint16_t control_send(int sd, enum bc_msg_type bmt, const char *jsonstr);
-int control_recv(int sd, uint16_t id);
+
+typedef int (*control_recv_cb)(struct bfd_control_msg *, void *arg);
+int control_recv(int sd, control_recv_cb cb, void *arg);
 
 struct json_object *ctrl_new_json(void);
 void ctrl_add_peer(struct json_object *msg, struct bfd_peer_cfg *bpc);
 
+int bcm_recv(struct bfd_control_msg *bcm, void *arg);
 const char *satostr(struct sockaddr_any *sa);
 int strtosa(const char *addr, struct sockaddr_any *sa);
 
@@ -53,6 +56,7 @@ void usage(void)
 
 	fprintf(stderr,
 		"%s: [OPTIONS...]\n"
+		"\t-M: monitor (show notifications)\n"
 		"\t-a: add peer\n"
 		"\t-d: delete peer\n"
 		"\t-i <ifname>: interface\n"
@@ -74,14 +78,14 @@ int main(int argc, char *argv[])
 	int csock;
 	int opt;
 	uint16_t cur_id;
-	bool mhop = false, verbose = false;
+	bool mhop = false, verbose = false, monitor = false;
 	struct sockaddr_any local, peer;
 	struct bfd_peer_cfg bpc;
 
 	memset(&local, 0, sizeof(local));
 	memset(&peer, 0, sizeof(peer));
 
-	while ((opt = getopt(argc, argv, "adi:l:mp:v")) != -1) {
+	while ((opt = getopt(argc, argv, "adi:l:Mmp:v")) != -1) {
 		switch (opt) {
 		case 'a':
 			if (bmt != 0) {
@@ -127,6 +131,10 @@ int main(int argc, char *argv[])
 					optarg);
 				exit(1);
 			}
+			break;
+
+		case 'M':
+			monitor = true;
 			break;
 
 		case 'm':
@@ -193,10 +201,58 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	control_recv(csock, cur_id);
+	control_recv(csock, bcm_recv, &cur_id);
+
+	if (monitor) {
+		cur_id = control_send(csock, BMT_NOTIFY, jsonstr);
+		if (cur_id == 0) {
+			fprintf(stderr, "failed to send message\n");
+			exit(1);
+		}
+
+		control_recv(csock, bcm_recv, &cur_id);
+
+		printf("Listening for events\n");
+
+		/* Expect notifications only */
+		cur_id = BCM_NOTIFY_ID;
+		while (control_recv(csock, bcm_recv, &cur_id) == 0) {
+			/* NOTHING */;
+		}
+	}
 
 	return 0;
 }
+
+int bcm_recv(struct bfd_control_msg *bcm, void *arg)
+{
+	uint16_t *id = arg;
+
+	if (ntohs(bcm->bcm_id) != *id) {
+		fprintf(stderr, "%s: expected id %d, but got %d\n",
+			__FUNCTION__, *id, ntohs(bcm->bcm_id));
+	}
+
+	switch (bcm->bcm_type) {
+	case BMT_RESPONSE:
+		printf("Response:\n%s\n", bcm->bcm_data);
+		break;
+
+	case BMT_NOTIFY:
+		printf("Notification:\n%s\n", bcm->bcm_data);
+		break;
+
+	case BMT_REQUEST_ADD:
+	case BMT_REQUEST_DEL:
+	default:
+		fprintf(stderr, "%s: invalid response type (%d)\n",
+			__FUNCTION__, bcm->bcm_type);
+		return -1;
+	}
+
+	return 0;
+}
+
 
 /*
  * JSON queries build
@@ -351,13 +407,13 @@ uint16_t control_send(int sd, enum bc_msg_type bmt, const char *jsonstr)
 	return id;
 }
 
-int control_recv(int sd, uint16_t id)
+int control_recv(int sd, control_recv_cb cb, void *arg)
 {
 	size_t bufpos, bufremaining, plen;
 	ssize_t bread;
 	struct bfd_control_msg *bcm, bcmh;
+	int ret;
 
-read_next:
 	bread = read(sd, &bcmh, sizeof(bcmh));
 	if (bread == 0) {
 		fprintf(stderr, "%s: bfdd closed connection\n", __FUNCTION__);
@@ -419,26 +475,11 @@ read_next:
 	if (bufpos > 0)
 		bcm->bcm_data[bufpos] = 0;
 
-	if (ntohs(bcm->bcm_id) != id) {
-		fprintf(stderr, "wrong message id (%d), waiting for more\n",
-			ntohs(bcm->bcm_id));
-		goto read_next;
-	}
-
-	switch (bcmh.bcm_type) {
-	case BMT_RESPONSE:
-	case BMT_NOTIFY:
-		printf("Response:\n%s\n", bcm->bcm_data);
-		break;
-
-	case BMT_REQUEST_ADD:
-	case BMT_REQUEST_DEL:
-	default:
-		fprintf(stderr, "%s: invalid response type (%d)\n",
-			__FUNCTION__, bcmh.bcm_type);
-		return -1;
-		break;
-	}
+	/* Use the callback, otherwise return success. */
+	if (cb != NULL)
+		ret = cb(bcm, arg);
+	else
+		ret = 0;
 
 	/*
 	 * Only try to free() memory that was allocated and not from
@@ -447,7 +488,7 @@ read_next:
 	if (plen > 0)
 		free(bcm);
 
-	return 0;
+	return ret;
 }
 
 
