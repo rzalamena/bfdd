@@ -113,7 +113,7 @@ int parse_list(struct json_object *jo, bool ipv4, bpc_handle h, void *arg)
 		result = parse_peer_config(jo_val, &bpc, ipv4);
 		error += result;
 		if (result == 0)
-			error += h(&bpc, arg);
+			error += (h(&bpc, arg) != 0);
 	}
 
 	return error;
@@ -312,6 +312,18 @@ char *config_notify(bfd_session *bs)
 	json_object_put(resp);
 
 	return jsonstr;
+}
+
+int config_notify_request(struct bfd_control_socket *bcs, const char *jsonstr,
+			  bpc_handle bh)
+{
+	struct json_object *jo;
+
+	jo = json_tokener_parse(jsonstr);
+	if (jo == NULL)
+		return -1;
+
+	return parse_config_json(jo, bh, bcs);
 }
 
 

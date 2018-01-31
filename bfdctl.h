@@ -67,10 +67,13 @@ enum bc_msg_type {
 	BMT_REQUEST_ADD = 2,
 	BMT_REQUEST_DEL = 3,
 	BMT_NOTIFY = 4,
+	BMT_NOTIFY_ADD = 5,
+	BMT_NOTIFY_DEL = 6,
 };
 
 /* Notify flags to use with bcm_notify. */
 #define BCM_NOTIFY_ALL ((uint64_t)-1)
+#define BCM_NOTIFY_PEER_STATE (1ULL << 0)
 #define BCM_NOTIFY_NONE 0
 
 /* Response 'status' definitions. */

@@ -34,7 +34,8 @@
 void usage(void);
 
 int control_init(void);
-uint16_t control_send(int sd, enum bc_msg_type bmt, const char *jsonstr);
+uint16_t control_send(int sd, enum bc_msg_type bmt, const void *data,
+		      size_t datalen);
 
 typedef int (*control_recv_cb)(struct bfd_control_msg *, void *arg);
 int control_recv(int sd, control_recv_cb cb, void *arg);
@@ -56,7 +57,7 @@ void usage(void)
 
 	fprintf(stderr,
 		"%s: [OPTIONS...]\n"
-		"\t-M: monitor (show notifications)\n"
+		"\t-M: monitor (show notifications for all peers or a specific)\n"
 		"\t-a: add peer\n"
 		"\t-d: delete peer\n"
 		"\t-i <ifname>: interface\n"
@@ -73,7 +74,7 @@ int main(int argc, char *argv[])
 {
 	struct json_object *jo;
 	const char *ifname = NULL;
-	const char *jsonstr;
+	const char *jsonstr = NULL;
 	enum bc_msg_type bmt = 0;
 	int csock;
 	int opt;
@@ -81,6 +82,7 @@ int main(int argc, char *argv[])
 	bool mhop = false, verbose = false, monitor = false;
 	struct sockaddr_any local, peer;
 	struct bfd_peer_cfg bpc;
+	uint64_t notify_flags = BCM_NOTIFY_ALL;
 
 	memset(&local, 0, sizeof(local));
 	memset(&peer, 0, sizeof(peer));
@@ -151,12 +153,16 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (bmt == 0) {
+	if (bmt == 0 && !monitor) {
 		fprintf(stderr, "you must specify an operation\n");
 		exit(1);
 	}
 
 	if (peer.sa_sin.sin_family == 0) {
+		if (monitor) {
+			goto skip_json;
+		}
+
 		fprintf(stderr, "you must specify a remote peer\n");
 		exit(1);
 	}
@@ -191,20 +197,29 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "%s\n", jsonstr);
 	}
 
+skip_json:
 	if ((csock = control_init()) == -1) {
 		exit(1);
 	}
 
-	cur_id = control_send(csock, bmt, jsonstr);
-	if (cur_id == 0) {
-		fprintf(stderr, "failed to send message\n");
-		exit(1);
+	if (bmt != 0) {
+		cur_id = control_send(csock, bmt, jsonstr, strlen(jsonstr));
+		if (cur_id == 0) {
+			fprintf(stderr, "failed to send message\n");
+			exit(1);
+		}
+
+		control_recv(csock, bcm_recv, &cur_id);
 	}
 
-	control_recv(csock, bcm_recv, &cur_id);
-
 	if (monitor) {
-		cur_id = control_send(csock, BMT_NOTIFY, jsonstr);
+		if (jsonstr == NULL) {
+			cur_id = control_send(csock, BMT_NOTIFY, &notify_flags,
+					      sizeof(notify_flags));
+		} else {
+			cur_id = control_send(csock, BMT_NOTIFY_ADD, jsonstr,
+				strlen(jsonstr));
+		}
 		if (cur_id == 0) {
 			fprintf(stderr, "failed to send message\n");
 			exit(1);
@@ -242,6 +257,8 @@ int bcm_recv(struct bfd_control_msg *bcm, void *arg)
 		printf("Notification:\n%s\n", bcm->bcm_data);
 		break;
 
+	case BMT_NOTIFY_ADD:
+	case BMT_NOTIFY_DEL:
 	case BMT_REQUEST_ADD:
 	case BMT_REQUEST_DEL:
 	default:
@@ -360,13 +377,15 @@ int control_init(void)
 	return sd;
 }
 
-uint16_t control_send(int sd, enum bc_msg_type bmt, const char *jsonstr)
+uint16_t control_send(int sd, enum bc_msg_type bmt, const void *data,
+		      size_t datalen)
 {
 	static uint16_t id = 0;
+	const uint8_t *dataptr = data;
 	ssize_t sent;
-	size_t total = strlen(jsonstr), cur = 0;
+	size_t cur = 0;
 	struct bfd_control_msg bcm = {
-		.bcm_length = htonl(total),
+		.bcm_length = htonl(datalen),
 		.bcm_type = bmt,
 		.bcm_ver = BMV_VERSION_1,
 		.bcm_id = htons(++id),
@@ -383,8 +402,8 @@ uint16_t control_send(int sd, enum bc_msg_type bmt, const char *jsonstr)
 		return 0;
 	}
 
-	while (total > 0) {
-		sent = write(sd, &jsonstr[cur], total);
+	while (datalen > 0) {
+		sent = write(sd, &dataptr[cur], datalen);
 		if (sent == 0) {
 			fprintf(stderr, "%s: bfdd closed connection\n",
 				__FUNCTION__);
@@ -400,7 +419,7 @@ uint16_t control_send(int sd, enum bc_msg_type bmt, const char *jsonstr)
 			return 0;
 		}
 
-		total -= sent;
+		datalen -= sent;
 		cur += sent;
 	}
 

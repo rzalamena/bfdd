@@ -333,6 +333,13 @@ struct bfd_control_queue {
 };
 TAILQ_HEAD(bcqueue, bfd_control_queue);
 
+struct bfd_notify_peer {
+	TAILQ_ENTRY(bfd_notify_peer) bnp_entry;
+
+	bfd_session *bnp_bs;
+};
+TAILQ_HEAD(bnplist, bfd_notify_peer);
+
 struct bfd_control_socket {
 	TAILQ_ENTRY(bfd_control_socket) bcs_entry;
 
@@ -341,7 +348,10 @@ struct bfd_control_socket {
 	struct event bcs_outev;
 	struct bcqueue bcs_bcqueue;
 
+	/* Notification data */
 	uint64_t bcs_notify;
+	struct bnplist bcs_bnplist;
+
 	enum bc_msg_version bcs_version;
 	enum bc_msg_type bcs_type;
 
@@ -390,6 +400,9 @@ char *config_response(const char *status, const char *error);
 char *config_notify(bfd_session *bs);
 
 typedef int (*bpc_handle)(struct bfd_peer_cfg *, void *arg);
+int config_notify_request(struct bfd_control_socket *bcs, const char *jsonstr,
+			  bpc_handle bh);
+
 
 /*
  * log.c
@@ -502,5 +515,8 @@ bfd_session *ptm_bfd_sess_find(bfd_pkt_t *cp, char *port_name,
 			       struct sockaddr_any *peer,
 			       struct sockaddr_any *local, char *vrf_name,
 			       bool is_mhop);
+
+bfd_session *bfd_find_shop(bfd_shop_key *k);
+bfd_session *bfd_find_mhop(bfd_mhop_key *k);
 
 #endif /* _BFD_H_ */

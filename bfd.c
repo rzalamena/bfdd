@@ -91,8 +91,6 @@ void bfd_echo_recvtimer_cb(evutil_socket_t sd, short ev, void *arg);
 void bfd_session_free(bfd_session *bs);
 bfd_session *bfd_session_new(int sd);
 bfd_session *bfd_find_disc(struct sockaddr_any *sa, uint32_t ldisc);
-bfd_session *bfd_find_shop(bfd_shop_key *k);
-bfd_session *bfd_find_mhop(bfd_mhop_key *k);
 
 static char *get_diag_str(int diag)
 {

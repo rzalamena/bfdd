@@ -35,6 +35,13 @@ void control_queue_free(struct bfd_control_socket *bcs,
 int control_queue_dequeue(struct bfd_control_socket *bcs);
 int control_queue_enqueue(struct bfd_control_socket *bcs,
 			  struct bfd_control_msg *bcm);
+struct bfd_notify_peer *control_notifypeer_new(struct bfd_control_socket *bcs,
+					       bfd_session *bs);
+void control_notifypeer_free(struct bfd_control_socket *bcs,
+			     struct bfd_notify_peer *bnp);
+struct bfd_notify_peer *control_notifypeer_find(struct bfd_control_socket *bcs,
+						bfd_session *bs);
+
 
 struct bfd_control_socket *control_new(int sd);
 void control_free(struct bfd_control_socket *bcs);
@@ -46,6 +53,12 @@ void control_handle_request_add(struct bfd_control_socket *bcs,
 				struct bfd_control_msg *bcm);
 void control_handle_request_del(struct bfd_control_socket *bcs,
 				struct bfd_control_msg *bcm);
+int notify_add_cb(struct bfd_peer_cfg *bpc, void *arg);
+int notify_del_cb(struct bfd_peer_cfg *bpc, void *arg);
+void control_handle_notify_add(struct bfd_control_socket *bcs,
+			       struct bfd_control_msg *bcm);
+void control_handle_notify_del(struct bfd_control_socket *bcs,
+			       struct bfd_control_msg *bcm);
 void control_handle_notify(struct bfd_control_socket *bcs,
 			   struct bfd_control_msg *bcm);
 void control_response(struct bfd_control_socket *bcs, uint16_t id,
@@ -130,6 +143,7 @@ struct bfd_control_socket *control_new(int sd)
 	event_add(&bcs->bcs_ev, NULL);
 
 	TAILQ_INIT(&bcs->bcs_bcqueue);
+	TAILQ_INIT(&bcs->bcs_bnplist);
 	TAILQ_INSERT_TAIL(&bglobal.bg_bcslist, bcs, bcs_entry);
 
 	return bcs;
@@ -138,6 +152,7 @@ struct bfd_control_socket *control_new(int sd)
 void control_free(struct bfd_control_socket *bcs)
 {
 	struct bfd_control_queue *bcq;
+	struct bfd_notify_peer *bnp;
 
 	event_del(&bcs->bcs_outev);
 	event_del(&bcs->bcs_ev);
@@ -151,8 +166,51 @@ void control_free(struct bfd_control_socket *bcs)
 		control_queue_free(bcs, bcq);
 	}
 
+	/* Empty notification list. */
+	while (!TAILQ_EMPTY(&bcs->bcs_bnplist)) {
+		bnp = TAILQ_FIRST(&bcs->bcs_bnplist);
+		control_notifypeer_free(bcs, bnp);
+	}
+
 	control_reset_buf(&bcs->bcs_bin);
 	free(bcs);
+}
+
+struct bfd_notify_peer *control_notifypeer_new(struct bfd_control_socket *bcs,
+					       bfd_session *bs)
+{
+	struct bfd_notify_peer *bnp;
+
+	bnp = calloc(1, sizeof(*bnp));
+	if (bnp == NULL) {
+		log_warning("%s: calloc: %s", __FUNCTION__, strerror(errno));
+		return NULL;
+	}
+
+	TAILQ_INSERT_TAIL(&bcs->bcs_bnplist, bnp, bnp_entry);
+	bnp->bnp_bs = bs;
+
+	return bnp;
+}
+
+void control_notifypeer_free(struct bfd_control_socket *bcs,
+			     struct bfd_notify_peer *bnp)
+{
+	TAILQ_REMOVE(&bcs->bcs_bnplist, bnp, bnp_entry);
+	free(bnp);
+}
+
+struct bfd_notify_peer *control_notifypeer_find(struct bfd_control_socket *bcs,
+						bfd_session *bs)
+{
+	struct bfd_notify_peer *bnp;
+
+	TAILQ_FOREACH (bnp, &bcs->bcs_bnplist, bnp_entry) {
+		if (bnp->bnp_bs == bs)
+			return bnp;
+	}
+
+	return NULL;
 }
 
 struct bfd_control_queue *control_queue_new(struct bfd_control_socket *bcs)
@@ -342,10 +400,18 @@ skip_header:
 	case BMT_NOTIFY:
 		control_handle_notify(bcs, bcb->bcb_bcm);
 		break;
+	case BMT_NOTIFY_ADD:
+		control_handle_notify_add(bcs, bcb->bcb_bcm);
+		break;
+	case BMT_NOTIFY_DEL:
+		control_handle_notify_del(bcs, bcb->bcb_bcm);
+		break;
 
 	default:
 		log_debug("%s: unhandled message type: %d\n", __FUNCTION__,
 			  bcm.bcm_type);
+		control_response(bcs, bcm.bcm_id, BCM_RESPONSE_ERROR,
+				 "invalid message type");
 		break;
 	}
 
@@ -411,6 +477,35 @@ void control_handle_request_del(struct bfd_control_socket *bcs,
 				 "request del failed");
 }
 
+static bfd_session *_notify_find_peer(struct bfd_peer_cfg *bpc)
+{
+	bfd_session *bs;
+	bfd_shop_key shop;
+	bfd_mhop_key mhop;
+
+	memset(&shop, 0, sizeof(shop));
+	if (bpc->bpc_mhop) {
+		memset(&mhop, 0, sizeof(mhop));
+		mhop.peer = bpc->bpc_peer;
+		mhop.local = bpc->bpc_local;
+		if (bpc->bpc_has_vrfname)
+			strxcpy(mhop.vrf_name, bpc->bpc_vrfname,
+				sizeof(mhop.vrf_name));
+
+		bs = bfd_find_mhop(&mhop);
+	} else {
+		memset(&shop, 0, sizeof(shop));
+		shop.peer = bpc->bpc_peer;
+		if (!bpc->bpc_has_vxlan && bpc->bpc_has_localif)
+			strxcpy(shop.port_name, bpc->bpc_localif,
+				sizeof(shop.port_name));
+
+		bs = bfd_find_shop(&shop);
+	}
+
+	return bs;
+}
+
 void control_handle_notify(struct bfd_control_socket *bcs,
 			   struct bfd_control_msg *bcm)
 {
@@ -419,6 +514,68 @@ void control_handle_notify(struct bfd_control_socket *bcs,
 	control_response(bcs, bcm->bcm_id, BCM_RESPONSE_OK, NULL);
 }
 
+int notify_add_cb(struct bfd_peer_cfg *bpc, void *arg)
+{
+	struct bfd_control_socket *bcs = arg;
+	bfd_session *bs = _notify_find_peer(bpc);
+
+	if (bs == NULL)
+		return -1;
+
+	if (control_notifypeer_new(bcs, bs) == NULL)
+		return -1;
+
+	return 0;
+}
+
+int notify_del_cb(struct bfd_peer_cfg *bpc, void *arg)
+{
+	struct bfd_control_socket *bcs = arg;
+	bfd_session *bs = _notify_find_peer(bpc);
+	struct bfd_notify_peer *bnp;
+
+	if (bs == NULL)
+		return -1;
+
+	bnp = control_notifypeer_find(bcs, bs);
+	if (bnp)
+		control_notifypeer_free(bcs, bnp);
+
+	return 0;
+}
+
+void control_handle_notify_add(struct bfd_control_socket *bcs,
+			       struct bfd_control_msg *bcm)
+{
+	const char *json = (const char *)bcm->bcm_data;
+
+	if (config_notify_request(bcs, json, notify_add_cb) == 0) {
+		control_response(bcs, bcm->bcm_id, BCM_RESPONSE_OK, NULL);
+		return;
+	}
+
+	control_response(bcs, bcm->bcm_id, BCM_RESPONSE_ERROR,
+			 "failed to parse notify data");
+}
+
+void control_handle_notify_del(struct bfd_control_socket *bcs,
+			       struct bfd_control_msg *bcm)
+{
+	const char *json = (const char *)bcm->bcm_data;
+
+	if (config_notify_request(bcs, json, notify_del_cb) == 0) {
+		control_response(bcs, bcm->bcm_id, BCM_RESPONSE_OK, NULL);
+		return;
+	}
+
+	control_response(bcs, bcm->bcm_id, BCM_RESPONSE_ERROR,
+			 "failed to parse notify data");
+}
+
+
+/*
+ * Internal functions used by the BFD daemon.
+ */
 void control_response(struct bfd_control_socket *bcs, uint16_t id,
 		      const char *status, const char *error)
 {
@@ -489,8 +646,27 @@ static void _control_notify(struct bfd_control_socket *bcs, bfd_session *bs)
 int control_notify(bfd_session *bs)
 {
 	struct bfd_control_socket *bcs;
+	struct bfd_notify_peer *bnp;
 
+	/*
+	 * PERFORMANCE: reuse the bfd_control_msg allocated data for
+	 * all control sockets to avoid wasting memory.
+	 */
 	TAILQ_FOREACH (bcs, &bglobal.bg_bcslist, bcs_entry) {
+		/*
+		 * Test for all notifications first, then search for
+		 * specific peers.
+		 */
+		if ((bcs->bcs_notify & BCM_NOTIFY_PEER_STATE) == 0) {
+			bnp = control_notifypeer_find(bcs, bs);
+			/*
+			 * If the notification is not configured here,
+			 * don't send it.
+			 */
+			if (bnp == NULL)
+				continue;
+		}
+
 		_control_notify(bcs, bs);
 	}
 
