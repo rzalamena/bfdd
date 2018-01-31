@@ -389,6 +389,7 @@ int config_request_del(const char *jsonstr);
 char *config_response(const char *status, const char *error);
 char *config_notify(bfd_session *bs);
 
+typedef int (*bpc_handle)(struct bfd_peer_cfg *, void *arg);
 
 /*
  * log.c
