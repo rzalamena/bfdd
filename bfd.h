@@ -25,25 +25,6 @@
 
 #define ETHERNET_ADDRESS_LENGTH 6
 
-/**
- * List of type of listening socket Fds supported by BFD.
- * BFD_SHOP_FD: Single hop socket Fd
- * BFD_MHOP_FD: Multi hop socket Fd
- * BFD_ECHO_FD: Echo socket Fd
- * BFD_SHOP6_FD: Single hop IPv6 socket Fd
- * BFD_MHOP6_FD: Multi hop IPv6 socket Fd
- * BFD_MAX_FD: Max socket Fd
- */
-typedef enum {
-	BFD_SHOP_FD = 0,
-	BFD_MHOP_FD,
-	BFD_ECHO_FD,
-	BFD_VXLAN_FD,
-	BFD_SHOP6_FD,
-	BFD_MHOP6_FD,
-	BFD_MAX_FD
-} bfd_fd_type_e;
-
 typedef struct bfd_timers {
 	uint32_t desired_min_tx;
 	uint32_t required_min_rx;
