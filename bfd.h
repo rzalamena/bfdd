@@ -133,6 +133,7 @@ typedef enum ptm_bfd_session_flags {
 	BFD_SESS_FLAG_SEND_EVT_ACTIVE = 1 << 5, /* send event timer active */
 	BFD_SESS_FLAG_SEND_EVT_IGNORE = 1 << 6, /* ignore send event when timer
 						 * expires */
+	BFD_SESS_FLAG_SHUTDOWN = 1 << 7,	/* disable BGP peer function */
 } bfd_session_flags;
 
 #define BFD_SET_FLAG(field, flag) (field |= flag)

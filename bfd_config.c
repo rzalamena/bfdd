@@ -132,13 +132,18 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc,
 	bpc->bpc_ipv4 = ipv4;
 	log_debug("\tpeer: %s\n", ipv4 ? "ipv4" : "ipv6");
 
+	/* Set defaults. */
+	bpc->bpc_detectmultiplier = BFD_DEFDETECTMULT;
+	bpc->bpc_recvinterval = BFD_DEFREQUIREDMINRX;
+	bpc->bpc_txinterval = BFD_DEFDESIREDMINTX;
+
 	JSON_FOREACH (jo, joi, join) {
 		key = json_object_iter_peek_name(&joi);
 		jo_val = json_object_iter_peek_value(&joi);
 
 		if (strcmp(key, "multihop") == 0) {
 			bpc->bpc_mhop = json_object_get_boolean(jo_val);
-			log_debug("\tmhop: %s\n",
+			log_debug("\tmultihop: %s\n",
 				  bpc->bpc_mhop ? "true" : "false");
 		} else if (strcmp(key, "peer-address") == 0) {
 			sval = json_object_get_string(jo_val);
@@ -176,10 +181,34 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc,
 				sizeof(bpc->bpc_vrfname));
 			bpc->bpc_has_vrfname = true;
 			log_debug("\tvrf-name: %s\n", sval);
+		} else if (strcmp(key, "detect-multiplier") == 0) {
+			bpc->bpc_detectmultiplier =
+				json_object_get_int64(jo_val);
+			bpc->bpc_has_detectmultiplier = true;
+			log_debug("\tdetect-multiplier: %llu\n",
+				  bpc->bpc_detectmultiplier);
+		} else if (strcmp(key, "receive-interval") == 0) {
+			bpc->bpc_recvinterval = json_object_get_int64(jo_val);
+			bpc->bpc_has_recvinterval = true;
+			log_debug("\treceive-interval: %llu\n",
+				  bpc->bpc_recvinterval);
+		} else if (strcmp(key, "transmit-interval") == 0) {
+			bpc->bpc_txinterval = json_object_get_int64(jo_val);
+			bpc->bpc_has_txinterval = true;
+			log_debug("\ttransmit-interval: %llu\n",
+				  bpc->bpc_txinterval);
+		} else if (strcmp(key, "create-only") == 0) {
+			bpc->bpc_createonly = json_object_get_boolean(jo_val);
+			log_debug("\tcreate-only: %s\n",
+				  bpc->bpc_createonly ? "true" : "false");
+		} else if (strcmp(key, "shutdown") == 0) {
+			bpc->bpc_shutdown = json_object_get_boolean(jo_val);
+			log_debug("\tshutdown: %s\n",
+				  bpc->bpc_shutdown ? "true" : "false");
 		} else {
 			sval = json_object_get_string(jo_val);
-			log_warning("%s:%d invalid configuration: %s\n",
-				    __FUNCTION__, __LINE__, sval);
+			log_warning("%s:%d invalid configuration: '%s: %s'\n",
+				    __FUNCTION__, __LINE__, key, sval);
 			error++;
 		}
 	}

@@ -91,6 +91,7 @@ void bfd_echo_recvtimer_cb(evutil_socket_t sd, short ev, void *arg);
 void bfd_session_free(bfd_session *bs);
 bfd_session *bfd_session_new(int sd);
 bfd_session *bfd_find_disc(struct sockaddr_any *sa, uint32_t ldisc);
+int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc);
 
 static char *get_diag_str(int diag)
 {
@@ -647,8 +648,6 @@ void bfd_echo_recvtimer_cb(evutil_socket_t sd __attribute__((unused)),
 	}
 }
 
-/* Was ptm_bfd_detect_TO() */
-
 bfd_session *bfd_session_new(int sd)
 {
 	bfd_session *bs;
@@ -672,6 +671,36 @@ bfd_session *bfd_session_new(int sd)
 	bs->sock = sd;
 
 	return bs;
+}
+
+int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
+{
+	/* User didn't want to update, return failure. */
+	if (bpc->bpc_createonly)
+		return -1;
+
+	/* TODO: handle `shutdown` gracefully. */
+	if (bpc->bpc_shutdown) {
+		BFD_SET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);
+	} else {
+		BFD_UNSET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);
+	}
+
+	if (bpc->bpc_has_txinterval) {
+		bs->up_min_tx = bpc->bpc_txinterval;
+	}
+
+	if (bpc->bpc_has_recvinterval) {
+		bs->timers.required_min_rx = bpc->bpc_recvinterval;
+	}
+
+	if (bpc->bpc_has_detectmultiplier) {
+		bs->detect_mult = bpc->bpc_detectmultiplier;
+	}
+
+	/* TODO add VxLAN support. */
+
+	return 0;
 }
 
 void bfd_session_free(bfd_session *bs)
@@ -714,9 +743,11 @@ bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 	}
 
 	if (l_bfd) {
-		DLOG("Duplicate session add event for neigh %s",
-		     satostr(&bpc->bpc_peer));
-		return NULL;
+		/* Requesting a duplicated peer means update configuration. */
+		if (bfd_session_update(l_bfd, bpc) == 0)
+			return l_bfd;
+		else
+			return NULL;
 	}
 
 	/*

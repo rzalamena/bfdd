@@ -35,6 +35,10 @@ struct sockaddr_any {
 #define MAXNAMELEN 32
 #endif
 
+#define BPC_DEF_DETECTMULTIPLIER 3
+#define BPC_DEF_RECEIVEINTERVAL 300  /* milliseconds */
+#define BPC_DEF_TRANSMITINTERVAL 300 /* milliseconds */
+
 struct bfd_peer_cfg {
 	bool bpc_mhop;
 	bool bpc_ipv4;
@@ -49,6 +53,18 @@ struct bfd_peer_cfg {
 
 	bool bpc_has_vrfname;
 	char bpc_vrfname[MAXNAMELEN + 1];
+
+	bool bpc_has_detectmultiplier;
+	uint8_t bpc_detectmultiplier;
+
+	bool bpc_has_recvinterval;
+	uint64_t bpc_recvinterval;
+
+	bool bpc_has_txinterval;
+	uint64_t bpc_txinterval;
+
+	bool bpc_createonly;
+	bool bpc_shutdown;
 };
 
 
