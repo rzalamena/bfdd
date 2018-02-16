@@ -672,3 +672,59 @@ int control_notify(bfd_session *bs)
 
 	return 0;
 }
+
+static void _control_notify_config(struct bfd_control_socket *bcs, const char *op, bfd_session *bs)
+{
+	struct bfd_control_msg *bcm;
+	char *jsonstr;
+	size_t jsonstrlen;
+
+	/* Generate JSON response. */
+	jsonstr = config_notify_config(op, bs);
+	if (jsonstr == NULL) {
+		log_warning("%s: config_notify_config: failed to get JSON str\n",
+			    __FUNCTION__);
+		return;
+	}
+
+	/* Allocate data and answer. */
+	jsonstrlen = strlen(jsonstr);
+	bcm = malloc(sizeof(struct bfd_control_msg) + jsonstrlen);
+	if (bcm == NULL) {
+		log_warning("%s: malloc: %s\n", __FUNCTION__, strerror(errno));
+		free(jsonstr);
+		return;
+	}
+
+	bcm->bcm_length = htonl(jsonstrlen);
+	bcm->bcm_ver = BMV_VERSION_1;
+	bcm->bcm_type = BMT_NOTIFY;
+	bcm->bcm_id = htons(BCM_NOTIFY_ID);
+	memcpy(bcm->bcm_data, jsonstr, jsonstrlen);
+	free(jsonstr);
+
+	control_queue_enqueue(bcs, bcm);
+}
+
+int control_notify_config(const char *op, bfd_session *bs)
+{
+	struct bfd_control_socket *bcs;
+
+	/*
+	 * PERFORMANCE: reuse the bfd_control_msg allocated data for
+	 * all control sockets to avoid wasting memory.
+	 */
+	TAILQ_FOREACH (bcs, &bglobal.bg_bcslist, bcs_entry) {
+		/*
+		 * Test for all notifications first, then search for
+		 * specific peers.
+		 */
+		if ((bcs->bcs_notify & BCM_NOTIFY_CONFIG) == 0) {
+			continue;
+		}
+
+		_control_notify_config(bcs, op, bs);
+	}
+
+	return 0;
+}

@@ -700,6 +700,8 @@ int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 
 	/* TODO add VxLAN support. */
 
+	control_notify_config(BCM_NOTIFY_CONFIG_UPDATE, bs);
+
 	return 0;
 }
 
@@ -853,6 +855,8 @@ bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 			bpc->bpc_localif);
 	}
 
+	control_notify_config(BCM_NOTIFY_CONFIG_ADD, bfd);
+
 	return bfd;
 }
 
@@ -892,6 +896,8 @@ void ptm_bfd_ses_del(struct bfd_peer_cfg *bpc)
 			bs->discrs.my_discr, satostr(&bs->shop.peer),
 			bs->shop.port_name);
 	}
+
+	control_notify_config(BCM_NOTIFY_CONFIG_DELETE, bs);
 
 	bfd_session_free(bs);
 }

@@ -364,7 +364,7 @@ TAILQ_HEAD(bcslist, bfd_control_socket);
 
 int control_init(void);
 int control_notify(bfd_session *bs);
-
+int control_notify_config(const char *op, bfd_session *bs);
 
 /*
  * bfdd.c
@@ -399,6 +399,7 @@ int config_request_add(const char *jsonstr);
 int config_request_del(const char *jsonstr);
 char *config_response(const char *status, const char *error);
 char *config_notify(bfd_session *bs);
+char *config_notify_config(const char *op, bfd_session *bs);
 
 typedef int (*bpc_handle)(struct bfd_peer_cfg *, void *arg);
 int config_notify_request(struct bfd_control_socket *bcs, const char *jsonstr,

@@ -90,11 +90,17 @@ enum bc_msg_type {
 /* Notify flags to use with bcm_notify. */
 #define BCM_NOTIFY_ALL ((uint64_t)-1)
 #define BCM_NOTIFY_PEER_STATE (1ULL << 0)
+#define BCM_NOTIFY_CONFIG (1ULL << 1)
 #define BCM_NOTIFY_NONE 0
 
 /* Response 'status' definitions. */
 #define BCM_RESPONSE_OK "ok"
 #define BCM_RESPONSE_ERROR "error"
+
+/* Notify configuration operation. */
+#define BCM_NOTIFY_CONFIG_ADD "add"
+#define BCM_NOTIFY_CONFIG_DELETE "delete"
+#define BCM_NOTIFY_CONFIG_UPDATE "update"
 
 /* Notification special ID. */
 #define BCM_NOTIFY_ID 0
