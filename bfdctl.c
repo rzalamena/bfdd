@@ -218,7 +218,7 @@ skip_json:
 					      sizeof(notify_flags));
 		} else {
 			cur_id = control_send(csock, BMT_NOTIFY_ADD, jsonstr,
-				strlen(jsonstr));
+					      strlen(jsonstr));
 		}
 		if (cur_id == 0) {
 			fprintf(stderr, "failed to send message\n");

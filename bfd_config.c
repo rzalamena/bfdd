@@ -258,32 +258,36 @@ char *config_notify(bfd_session *bs)
 	if (resp == NULL)
 		return NULL;
 
+	/* Add peer 'key' information. */
+	json_object_add_bool(resp, "ipv6",
+			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_IPV6));
+	json_object_add_bool(resp, "multihop",
+			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH));
 	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
-		if (json_object_add_bool(resp, "multihop", true) == -1)
-			return NULL;
-		if (json_object_add_string(resp, "peer",
+		if (json_object_add_string(resp, "peer-address",
 					   satostr(&bs->mhop.peer))
 		    == -1)
 			return NULL;
-		if (json_object_add_string(resp, "local",
+		if (json_object_add_string(resp, "local-address",
 					   satostr(&bs->mhop.local))
 		    == -1)
 			return NULL;
+		if (strlen(bs->mhop.vrf_name) > 0) {
+			json_object_add_string(resp, "vrf-name",
+					       bs->mhop.vrf_name);
+		}
 	} else {
-		if (json_object_add_bool(resp, "multihop", false) == -1)
-			return NULL;
-		if (json_object_add_string(resp, "peer",
+		if (json_object_add_string(resp, "peer-address",
 					   satostr(&bs->shop.peer))
 		    == -1)
 			return NULL;
+		if (strlen(bs->shop.port_name) > 0) {
+			json_object_add_string(resp, "local-interface",
+					       bs->shop.port_name);
+		}
 	}
 
-	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_IPV6)) {
-		json_object_add_bool(resp, "ipv6", true);
-	} else {
-		json_object_add_bool(resp, "ipv6", false);
-	}
-
+	/* Add status information */
 	json_object_add_int(resp, "id", bs->discrs.my_discr);
 	json_object_add_int(resp, "remote-id", bs->discrs.my_discr);
 
