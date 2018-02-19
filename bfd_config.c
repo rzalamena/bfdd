@@ -58,8 +58,7 @@ int config_add(struct bfd_peer_cfg *bpc, void *arg __attribute__((unused)))
 
 int config_del(struct bfd_peer_cfg *bpc, void *arg __attribute__((unused)))
 {
-	ptm_bfd_ses_del(bpc);
-	return 0;
+	return ptm_bfd_ses_del(bpc) != 0;
 }
 
 int parse_config_json(struct json_object *jo, bpc_handle h, void *arg)

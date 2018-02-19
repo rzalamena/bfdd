@@ -504,7 +504,7 @@ extern bfd_state_str_list state_list[];
 
 bfd_session *bs_session_find(uint32_t discr);
 bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc);
-void ptm_bfd_ses_del(struct bfd_peer_cfg *bpc);
+int ptm_bfd_ses_del(struct bfd_peer_cfg *bpc);
 void ptm_bfd_ses_dn(bfd_session *bfd, uint8_t diag);
 void ptm_bfd_ses_up(bfd_session *bfd);
 void fetch_portname_from_ifindex(int ifindex, char *ifname, size_t ifnamelen);

@@ -711,6 +711,14 @@ void bfd_session_free(bfd_session *bs)
 	event_del(&bs->echo_recvtimer_ev);
 	event_del(&bs->xmttimer_ev);
 	event_del(&bs->echo_xmttimer_ev);
+
+	HASH_DELETE(sh, session_hash, bs);
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
+		HASH_DELETE(mh, local_peer_hash, bs);
+	} else {
+		HASH_DELETE(ph, peer_hash, bs);
+	}
+
 	free(bs);
 }
 
@@ -857,7 +865,7 @@ bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 	return bfd;
 }
 
-void ptm_bfd_ses_del(struct bfd_peer_cfg *bpc)
+int ptm_bfd_ses_del(struct bfd_peer_cfg *bpc)
 {
 	bfd_session *bs;
 	bfd_mhop_key mhop;
@@ -874,14 +882,16 @@ void ptm_bfd_ses_del(struct bfd_peer_cfg *bpc)
 
 		bs = bfd_find_mhop(&mhop);
 	} else {
+		memset(&shop, 0, sizeof(shop));
 		shop.peer = bpc->bpc_peer;
-		memset(shop.port_name, 0, sizeof(shop.port_name));
 		if (!bpc->bpc_has_vxlan && bpc->bpc_has_localif)
 			strxcpy(shop.port_name, bpc->bpc_localif,
 				sizeof(shop.port_name));
 
 		bs = bfd_find_shop(&shop);
 	}
+	if (bs == NULL)
+		return -1;
 
 	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
 		INFOLOG("Deleting session 0x%x with vrf %s peer %s local %s",
@@ -897,4 +907,6 @@ void ptm_bfd_ses_del(struct bfd_peer_cfg *bpc)
 	control_notify_config(BCM_NOTIFY_CONFIG_DELETE, bs);
 
 	bfd_session_free(bs);
+
+	return 0;
 }
