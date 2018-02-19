@@ -64,6 +64,9 @@ void control_handle_notify(struct bfd_control_socket *bcs,
 void control_response(struct bfd_control_socket *bcs, uint16_t id,
 		      const char *status, const char *error);
 
+static void _control_notify_config(struct bfd_control_socket *bcs,
+				   const char *op, bfd_session *bs);
+
 
 /*
  * Functions
@@ -512,6 +515,19 @@ void control_handle_notify(struct bfd_control_socket *bcs,
 	bcs->bcs_notify = *(uint64_t *)bcm->bcm_data;
 
 	control_response(bcs, bcm->bcm_id, BCM_RESPONSE_OK, NULL);
+
+	/*
+	 * If peer asked for notification configuration, send everything that
+	 * was configured until the moment to sync up.
+	 */
+	if (bcs->bcs_notify & BCM_NOTIFY_CONFIG) {
+		bfd_session *bs, *tmp;
+		extern bfd_session *session_hash;
+
+		HASH_ITER (sh, session_hash, bs, tmp) {
+			_control_notify_config(bcs, BCM_NOTIFY_CONFIG_ADD, bs);
+		}
+	}
 }
 
 int notify_add_cb(struct bfd_peer_cfg *bpc, void *arg)

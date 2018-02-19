@@ -39,6 +39,14 @@ struct sockaddr_any {
 #define BPC_DEF_RECEIVEINTERVAL 300  /* milliseconds */
 #define BPC_DEF_TRANSMITINTERVAL 300 /* milliseconds */
 
+/* Peer status */
+enum bfd_peer_status {
+	BPS_SHUTDOWN = 0, /* == PTM_BFD_ADM_DOWN, "adm-down" */
+	BPS_DOWN = 1,     /* == PTM_BFD_DOWN, "down" */
+	BPS_INIT = 2,     /* == PTM_BFD_INIT, "init" */
+	BPS_UP = 3,       /* == PTM_BFD_UP, "up" */
+};
+
 struct bfd_peer_cfg {
 	bool bpc_mhop;
 	bool bpc_ipv4;
@@ -65,6 +73,11 @@ struct bfd_peer_cfg {
 
 	bool bpc_createonly;
 	bool bpc_shutdown;
+
+	/* Status information */
+	enum bfd_peer_status bpc_bps;
+	uint32_t bpc_id;
+	uint32_t bpc_remoteid;
 };
 
 
@@ -97,7 +110,8 @@ enum bc_msg_type {
 #define BCM_RESPONSE_OK "ok"
 #define BCM_RESPONSE_ERROR "error"
 
-/* Notify configuration operation. */
+/* Notify operation. */
+#define BCM_NOTIFY_PEER_STATUS "status"
 #define BCM_NOTIFY_CONFIG_ADD "add"
 #define BCM_NOTIFY_CONFIG_DELETE "delete"
 #define BCM_NOTIFY_CONFIG_UPDATE "update"

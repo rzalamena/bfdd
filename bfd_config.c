@@ -287,6 +287,8 @@ char *config_notify(bfd_session *bs)
 	if (resp == NULL)
 		return NULL;
 
+	json_object_add_string(resp, "op", BCM_NOTIFY_PEER_STATUS);
+
 	/* Add peer 'key' information. */
 	json_object_add_bool(resp, "ipv6",
 			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_IPV6));
