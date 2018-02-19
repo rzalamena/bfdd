@@ -1081,6 +1081,7 @@ int bp_peer_socket(struct bfd_peer_cfg *bpc)
 			/* Searched all ports, none available */
 			ERRLOG("Can't find source port for new session: %s",
 			       strerror(errno));
+			close(sd);
 			return -1;
 		}
 		if (srcPort >= BFD_SRCPORTMAX)
