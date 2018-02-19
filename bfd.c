@@ -114,20 +114,17 @@ static void _ptm_bfd_ses_dump(void)
 	bfd_session *bfd, *tmp;
 
 	DLOG("\n=======\nSessions List");
-	HASH_ITER(sh, session_hash, bfd, tmp)
-	{
+	HASH_ITER (sh, session_hash, bfd, tmp) {
 		DLOG("\tsession 0x%x with peer %s", bfd->discrs.my_discr,
 		     satostr(&bfd->shop.peer));
 	}
 	DLOG("\n=======\nSingle-hop peers List");
-	HASH_ITER(ph, peer_hash, bfd, tmp)
-	{
+	HASH_ITER (ph, peer_hash, bfd, tmp) {
 		DLOG("\tport/peer %s/%s with session 0x%x", bfd->shop.port_name,
 		     satostr(&bfd->shop.peer), bfd->discrs.my_discr);
 	}
 	DLOG("\n=======\nmultihop peers List");
-	HASH_ITER(mh, local_peer_hash, bfd, tmp)
-	{
+	HASH_ITER (mh, local_peer_hash, bfd, tmp) {
 		DLOG("\tvrf %s local/peer %s/%s with session 0x%x",
 		     (strlen(bfd->mhop.vrf_name)) ? bfd->mhop.vrf_name : "N/A",
 		     satostr(&bfd->mhop.local), satostr(&bfd->mhop.peer),

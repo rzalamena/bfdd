@@ -689,7 +689,8 @@ int control_notify(bfd_session *bs)
 	return 0;
 }
 
-static void _control_notify_config(struct bfd_control_socket *bcs, const char *op, bfd_session *bs)
+static void _control_notify_config(struct bfd_control_socket *bcs,
+				   const char *op, bfd_session *bs)
 {
 	struct bfd_control_msg *bcm;
 	char *jsonstr;
@@ -698,8 +699,9 @@ static void _control_notify_config(struct bfd_control_socket *bcs, const char *o
 	/* Generate JSON response. */
 	jsonstr = config_notify_config(op, bs);
 	if (jsonstr == NULL) {
-		log_warning("%s: config_notify_config: failed to get JSON str\n",
-			    __FUNCTION__);
+		log_warning(
+			"%s: config_notify_config: failed to get JSON str\n",
+			__FUNCTION__);
 		return;
 	}
 
