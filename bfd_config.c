@@ -92,8 +92,9 @@ int parse_config(const char *fname)
 	struct json_object *jo;
 
 	jo = json_object_from_file(fname);
-	if (jo == NULL)
-		log_fatal("failed to load configuration from %s\n", fname);
+	if (jo == NULL) {
+		return -1;
+	}
 
 	return parse_config_json(jo, config_add, NULL);
 }
