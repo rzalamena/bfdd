@@ -184,6 +184,10 @@ struct bfd_notify_peer *control_notifypeer_new(struct bfd_control_socket *bcs,
 {
 	struct bfd_notify_peer *bnp;
 
+	bnp = control_notifypeer_find(bcs, bs);
+	if (bnp)
+		return bnp;
+
 	bnp = calloc(1, sizeof(*bnp));
 	if (bnp == NULL) {
 		log_warning("%s: calloc: %s", __FUNCTION__, strerror(errno));
@@ -727,6 +731,16 @@ static void _control_notify_config(struct bfd_control_socket *bcs,
 int control_notify_config(const char *op, bfd_session *bs)
 {
 	struct bfd_control_socket *bcs;
+	struct bfd_notify_peer *bnp;
+
+	/* Remove the control sockets notification for this peer. */
+	if (strcmp(op, BCM_NOTIFY_CONFIG_DELETE) == 0) {
+		TAILQ_FOREACH (bcs, &bglobal.bg_bcslist, bcs_entry) {
+			bnp = control_notifypeer_find(bcs, bs);
+			if (bnp)
+				control_notifypeer_free(bcs, bnp);
+		}
+	}
 
 	/*
 	 * PERFORMANCE: reuse the bfd_control_msg allocated data for
