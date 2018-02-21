@@ -180,7 +180,7 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 		} else if (strcmp(key, "peer-address") == 0) {
 			sval = json_object_get_string(jo_val);
 			if (strtosa(sval, &bpc->bpc_peer) != 0
-			    && bpc->bpc_peer.sa_sin.sin_family == family_type) {
+			    || bpc->bpc_peer.sa_sin.sin_family != family_type) {
 				log_info(
 					"%s:%d failed to parse peer-address '%s'",
 					__FUNCTION__, __LINE__, sval);
@@ -190,7 +190,7 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 		} else if (strcmp(key, "local-address") == 0) {
 			sval = json_object_get_string(jo_val);
 			if (strtosa(sval, &bpc->bpc_local) != 0
-			    && bpc->bpc_peer.sa_sin.sin_family == family_type) {
+			    || bpc->bpc_peer.sa_sin.sin_family != family_type) {
 				log_info(
 					"%s:%d failed to parse local-address '%s'",
 					__FUNCTION__, __LINE__, sval);
@@ -198,21 +198,32 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 			}
 			log_debug("\tlocal-address: %s\n", sval);
 		} else if (strcmp(key, "local-interface") == 0) {
-			sval = json_object_get_string(jo_val);
-			strxcpy(bpc->bpc_localif, sval,
-				sizeof(bpc->bpc_localif));
 			bpc->bpc_has_localif = true;
-			log_debug("\tlocal-interface: %s\n", sval);
+			sval = json_object_get_string(jo_val);
+			if (strxcpy(bpc->bpc_localif, sval,
+				    sizeof(bpc->bpc_localif))
+			    > sizeof(bpc->bpc_localif)) {
+				log_debug(
+					"\tlocal-interface: %s (truncated)\n");
+				error++;
+			} else {
+				log_debug("\tlocal-interface: %s\n", sval);
+			}
 		} else if (strcmp(key, "vxlan") == 0) {
 			bpc->bpc_vxlan = json_object_get_int64(jo_val);
 			bpc->bpc_has_vxlan = true;
 			log_debug("\tvxlan: %ld\n", bpc->bpc_vxlan);
 		} else if (strcmp(key, "vrf-name") == 0) {
-			sval = json_object_get_string(jo_val);
-			strxcpy(bpc->bpc_vrfname, sval,
-				sizeof(bpc->bpc_vrfname));
 			bpc->bpc_has_vrfname = true;
-			log_debug("\tvrf-name: %s\n", sval);
+			sval = json_object_get_string(jo_val);
+			if (strxcpy(bpc->bpc_vrfname, sval,
+				    sizeof(bpc->bpc_vrfname))
+			    > sizeof(bpc->bpc_vrfname)) {
+				log_debug("\tvrf-name: %s (truncated)\n", sval);
+				error++;
+			} else {
+				log_debug("\tvrf-name: %s\n", sval);
+			}
 		} else if (strcmp(key, "detect-multiplier") == 0) {
 			bpc->bpc_detectmultiplier =
 				json_object_get_int64(jo_val);
