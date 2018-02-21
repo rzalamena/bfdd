@@ -893,6 +893,12 @@ int ptm_bfd_ses_del(struct bfd_peer_cfg *bpc)
 	if (bs == NULL)
 		return -1;
 
+	/*
+	 * This pointer is being referenced somewhere, don't let it be deleted.
+	 */
+	if (bs->refcount > 0)
+		return -1;
+
 	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
 		INFOLOG("Deleting session 0x%x with vrf %s peer %s local %s",
 			bs->discrs.my_discr,

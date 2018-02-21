@@ -196,6 +196,7 @@ struct bfd_notify_peer *control_notifypeer_new(struct bfd_control_socket *bcs,
 
 	TAILQ_INSERT_TAIL(&bcs->bcs_bnplist, bnp, bnp_entry);
 	bnp->bnp_bs = bs;
+	bs->refcount++;
 
 	return bnp;
 }
@@ -204,6 +205,7 @@ void control_notifypeer_free(struct bfd_control_socket *bcs,
 			     struct bfd_notify_peer *bnp)
 {
 	TAILQ_REMOVE(&bcs->bcs_bnplist, bnp, bnp_entry);
+	bnp->bnp_bs->refcount--;
 	free(bnp);
 }
 
@@ -734,7 +736,7 @@ int control_notify_config(const char *op, bfd_session *bs)
 	struct bfd_notify_peer *bnp;
 
 	/* Remove the control sockets notification for this peer. */
-	if (strcmp(op, BCM_NOTIFY_CONFIG_DELETE) == 0) {
+	if (strcmp(op, BCM_NOTIFY_CONFIG_DELETE) == 0 && bs->refcount > 0) {
 		TAILQ_FOREACH (bcs, &bglobal.bg_bcslist, bcs_entry) {
 			bnp = control_notifypeer_find(bcs, bs);
 			if (bnp)

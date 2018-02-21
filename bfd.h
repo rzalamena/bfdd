@@ -239,6 +239,8 @@ typedef struct ptm_bfd_session {
 
 	struct timeval uptime;   /* last up time */
 	struct timeval downtime; /* last down time */
+
+	uint64_t refcount; /* number of pointers referencing this. */
 } bfd_session;
 
 /**
