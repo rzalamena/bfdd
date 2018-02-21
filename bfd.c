@@ -695,6 +695,35 @@ int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 		bs->detect_mult = bpc->bpc_detectmultiplier;
 	}
 
+	if (bpc->bpc_has_label) {
+		do {
+			/* Check for new label installation */
+			if (bs->pl == NULL) {
+				if (pl_find(bpc->bpc_label) != NULL) {
+					/* Someone is already using it. */
+					break;
+				}
+
+				pl_new(bpc->bpc_label, bs);
+				break;
+			}
+
+			/*
+			 * Test new label consistency:
+			 * - Do nothing if its the same label;
+			 * - Check if the future label is already taken;
+			 * - Change label;
+			 */
+			if (strcmp(bpc->bpc_label, bs->pl->pl_label) == 0)
+				break;
+			if (pl_find(bpc->bpc_label) != NULL)
+				break;
+
+			strxcpy(bs->pl->pl_label, bpc->bpc_label,
+				sizeof(bs->pl->pl_label));
+		} while (0);
+	}
+
 	/* TODO add VxLAN support. */
 
 	control_notify_config(BCM_NOTIFY_CONFIG_UPDATE, bs);
@@ -724,12 +753,21 @@ void bfd_session_free(bfd_session *bs)
 
 bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 {
+	struct peer_label *pl;
 	bfd_session *bfd, *l_bfd;
 	bfd_mhop_key mhop;
 	bfd_shop_key shop;
 	int psock;
 
 	/* check to see if this needs a new session */
+	if (bpc->bpc_has_label) {
+		pl = pl_find(bpc->bpc_label);
+		if (pl) {
+			l_bfd = pl->pl_bs;
+			goto skip_address_lookup;
+		}
+	}
+
 	if (bpc->bpc_mhop) {
 		memset(&mhop, 0, sizeof(mhop));
 		mhop.peer = bpc->bpc_peer;
@@ -749,6 +787,7 @@ bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 		l_bfd = bfd_find_shop(&shop);
 	}
 
+skip_address_lookup:
 	if (l_bfd) {
 		/* Requesting a duplicated peer means update configuration. */
 		if (bfd_session_update(l_bfd, bpc) == 0)
@@ -781,6 +820,13 @@ bfd_session *ptm_bfd_sess_new(struct bfd_peer_cfg *bpc)
 		ERRLOG("Can't malloc memory for new session: %s",
 		       strerror(errno));
 		return NULL;
+	}
+
+	if (bpc->bpc_has_label) {
+		if (pl_new(bpc->bpc_label, bfd) == NULL) {
+			log_error("%s:%d: failed to label peer\n", __FUNCTION__,
+				  __LINE__);
+		}
 	}
 
 	if (bpc->bpc_has_localif && !bpc->bpc_mhop) {

@@ -17,6 +17,9 @@
       "_local-interface": "optional",
       "local-interface": "enp0s3",
 
+      "_label": "optional",
+      "label": "peer1",
+
       "_vxlan": "optional, defaults to 0",
       "vxlan": 100,
 
@@ -37,5 +40,12 @@
     }
   ],
   "ipv6": [
+  ],
+  "label": [
+    {
+      "_label": "mandatory to identify the peer without addresses",
+      "_label-help": "peer must have been already created in ipv4 or ipv6",
+      "label": "peer1",
+    }
   ]
 }

@@ -178,6 +178,9 @@ typedef struct ptm_bfd_session_vxlan_info {
 	struct in_addr peer_dst_ip;
 } bfd_session_vxlan_info_t;
 
+/* bfd_session shortcut label forwarding. */
+struct peer_label;
+
 /*
  * Session state information
  */
@@ -210,6 +213,7 @@ typedef struct ptm_bfd_session {
 	uint8_t polling;
 
 	/* This and the localDiscr are the keys to state info */
+	struct peer_label *pl;
 	union {
 		bfd_shop_key shop;
 		bfd_mhop_key mhop;
@@ -242,6 +246,14 @@ typedef struct ptm_bfd_session {
 
 	uint64_t refcount; /* number of pointers referencing this. */
 } bfd_session;
+
+struct peer_label {
+	TAILQ_ENTRY(peer_label) pl_entry;
+
+	bfd_session *pl_bs;
+	char pl_label[MAXNAMELEN];
+};
+TAILQ_HEAD(pllist, peer_label);
 
 /**
  * List of IP address family supported by BFD session.
@@ -386,6 +398,8 @@ struct bfd_global {
 	struct event bg_csockev;
 	struct bcslist bg_bcslist;
 
+	struct pllist bg_pllist;
+
 	struct event_base *bg_eb;
 };
 extern struct bfd_global bglobal;
@@ -406,6 +420,9 @@ char *config_notify_config(const char *op, bfd_session *bs);
 typedef int (*bpc_handle)(struct bfd_peer_cfg *, void *arg);
 int config_notify_request(struct bfd_control_socket *bcs, const char *jsonstr,
 			  bpc_handle bh);
+
+struct peer_label *pl_new(const char *label, bfd_session *bs);
+struct peer_label *pl_find(const char *label);
 
 
 /*

@@ -53,6 +53,9 @@ struct bfd_peer_cfg {
 	struct sockaddr_any bpc_peer;
 	struct sockaddr_any bpc_local;
 
+	bool bpc_has_label;
+	char bpc_label[MAXNAMELEN];
+
 	bool bpc_has_vxlan;
 	unsigned int bpc_vxlan;
 

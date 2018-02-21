@@ -44,6 +44,7 @@ enum peer_list_type {
 int parse_config_json(struct json_object *jo, bpc_handle h, void *arg);
 int parse_list(struct json_object *jo, enum peer_list_type plt, bpc_handle h, void *arg);
 int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc);
+int parse_peer_label_config(struct json_object *jo, struct bfd_peer_cfg *bpc);
 
 int config_add(struct bfd_peer_cfg *bpc, void *arg);
 int config_del(struct bfd_peer_cfg *bpc, void *arg);
@@ -52,6 +53,9 @@ int json_object_add_string(struct json_object *jo, const char *key,
 			   const char *str);
 int json_object_add_bool(struct json_object *jo, const char *key, bool boolean);
 int json_object_add_int(struct json_object *jo, const char *key, int64_t value);
+
+void pl_free(struct peer_label *pl);
+
 
 /*
  * Implementation
@@ -81,6 +85,8 @@ int parse_config_json(struct json_object *jo, bpc_handle h, void *arg)
 			error += parse_list(jo_val, PLT_IPV4, h, arg);
 		} else if (strcmp(key, "ipv6") == 0) {
 			error += parse_list(jo_val, PLT_IPV6, h, arg);
+		} else if (strcmp(key, "label") == 0) {
+			error += parse_list(jo_val, PLT_LABEL, h, arg);
 		} else {
 			sval = json_object_get_string(jo_val);
 			log_warning("%s:%d invalid configuration: %s\n",
@@ -129,6 +135,12 @@ int parse_list(struct json_object *jo, enum peer_list_type plt, bpc_handle h, vo
 		case PLT_IPV6:
 			log_debug("ipv6 peers %d:\n", allen);
 			bpc.bpc_ipv4 = false;
+			break;
+		case PLT_LABEL:
+			log_debug("label peers %d:\n", allen);
+			if (parse_peer_label_config(jo_val, &bpc) != 0) {
+				continue;
+			}
 			break;
 
 		default:
@@ -225,6 +237,17 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 			bpc->bpc_shutdown = json_object_get_boolean(jo_val);
 			log_debug("\tshutdown: %s\n",
 				  bpc->bpc_shutdown ? "true" : "false");
+		} else if (strcmp(key, "label") == 0) {
+			bpc->bpc_has_label = true;
+			sval = json_object_get_string(jo_val);
+			if (strxcpy(bpc->bpc_label, sval,
+				    sizeof(bpc->bpc_label))
+			    > sizeof(bpc->bpc_label)) {
+				log_debug("\tlabel: %s (truncated)\n", sval);
+				error++;
+			} else {
+				log_debug("\tlabel: %s\n", sval);
+			}
 		} else {
 			sval = json_object_get_string(jo_val);
 			log_warning("%s:%d invalid configuration: '%s: %s'\n",
@@ -233,8 +256,55 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 		}
 	}
 
+	if (bpc->bpc_peer.sa_sin.sin_family == 0) {
+		log_debug("%s:%d no peer address provided\n", __FUNCTION__,
+			  __LINE__);
+		error++;
+	}
+
 	return error;
 }
+
+int parse_peer_label_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
+{
+	struct peer_label *pl;
+	struct json_object *label;
+	const char *sval;
+
+	/* Get label and translate it to BFD daemon key. */
+	if (!json_object_object_get_ex(jo, "label", &label)) {
+		return 1;
+	}
+
+	sval = json_object_get_string(label);
+
+	pl = pl_find(sval);
+	if (pl == NULL)
+		return 1;
+
+	/* Translate the label into BFD address keys. */
+	bpc->bpc_ipv4 = !BFD_CHECK_FLAG(pl->pl_bs->flags, BFD_SESS_FLAG_IPV6);
+	bpc->bpc_mhop = BFD_CHECK_FLAG(pl->pl_bs->flags, BFD_SESS_FLAG_MH);
+	if (bpc->bpc_mhop) {
+		bpc->bpc_peer = pl->pl_bs->mhop.peer;
+		bpc->bpc_local = pl->pl_bs->mhop.local;
+		if (pl->pl_bs->mhop.vrf_name[0]) {
+			bpc->bpc_has_vrfname = true;
+			strxcpy(bpc->bpc_vrfname, pl->pl_bs->mhop.vrf_name,
+				sizeof(bpc->bpc_vrfname));
+		}
+	} else {
+		bpc->bpc_peer = pl->pl_bs->shop.peer;
+		if (pl->pl_bs->shop.port_name[0]) {
+			bpc->bpc_has_localif = true;
+			strxcpy(bpc->bpc_localif, pl->pl_bs->shop.port_name,
+				sizeof(bpc->bpc_localif));
+		}
+	}
+
+	return 0;
+}
+
 
 /*
  * Control socket JSON parsing.
@@ -409,6 +479,10 @@ char *config_notify_config(const char *op, bfd_session *bs)
 		}
 	}
 
+	if (bs->pl) {
+		json_object_add_string(resp, "label", bs->pl->pl_label);
+	}
+
 	/* On peer deletion we don't need to add any additional information. */
 	if (strcmp(op, BCM_NOTIFY_CONFIG_DELETE) == 0) {
 		goto skip_config;
@@ -487,4 +561,52 @@ int json_object_add_int(struct json_object *jo, const char *key, int64_t value)
 
 	json_object_object_add(jo, key, jon);
 	return 0;
+}
+
+
+/*
+ * Label handling
+ */
+struct peer_label *pl_find(const char *label)
+{
+	struct peer_label *pl;
+
+	TAILQ_FOREACH (pl, &bglobal.bg_pllist, pl_entry) {
+		if (strcmp(pl->pl_label, label) != 0)
+			continue;
+
+		return pl;
+	}
+
+	return NULL;
+}
+
+struct peer_label *pl_new(const char *label, bfd_session *bs)
+{
+	struct peer_label *pl;
+
+	pl = calloc(1, sizeof(*pl));
+	if (pl == NULL)
+		return NULL;
+
+	if (strxcpy(pl->pl_label, label, sizeof(pl->pl_label))
+	    > sizeof(pl->pl_label)) {
+		log_warning("%s:%d: label was truncated\n", __FUNCTION__,
+			    __LINE__);
+	}
+	pl->pl_bs = bs;
+	bs->pl = pl;
+
+	TAILQ_INSERT_HEAD(&bglobal.bg_pllist, pl, pl_entry);
+
+	return pl;
+}
+
+void pl_free(struct peer_label *pl)
+{
+	/* Remove the pointer back. */
+	pl->pl_bs->pl = NULL;
+
+	TAILQ_REMOVE(&bglobal.bg_pllist, pl, pl_entry);
+	free(pl);
 }
