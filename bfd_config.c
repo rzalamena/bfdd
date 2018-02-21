@@ -31,14 +31,19 @@
 	     json_object_iter_equal(&(joi), &(join)) == 0;                     \
 	     json_object_iter_next(&(joi)))
 
+enum peer_list_type {
+	PLT_IPV4,
+	PLT_IPV6,
+	PLT_LABEL,
+};
+
 
 /*
  * Prototypes
  */
 int parse_config_json(struct json_object *jo, bpc_handle h, void *arg);
-int parse_list(struct json_object *jo, bool ipv4, bpc_handle h, void *arg);
-int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc,
-		      bool ipv4);
+int parse_list(struct json_object *jo, enum peer_list_type plt, bpc_handle h, void *arg);
+int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc);
 
 int config_add(struct bfd_peer_cfg *bpc, void *arg);
 int config_del(struct bfd_peer_cfg *bpc, void *arg);
@@ -73,9 +78,9 @@ int parse_config_json(struct json_object *jo, bpc_handle h, void *arg)
 		jo_val = json_object_iter_peek_value(&joi);
 
 		if (strcmp(key, "ipv4") == 0) {
-			error += parse_list(jo_val, true, h, arg);
+			error += parse_list(jo_val, PLT_IPV4, h, arg);
 		} else if (strcmp(key, "ipv6") == 0) {
-			error += parse_list(jo_val, false, h, arg);
+			error += parse_list(jo_val, PLT_IPV6, h, arg);
 		} else {
 			sval = json_object_get_string(jo_val);
 			log_warning("%s:%d invalid configuration: %s\n",
@@ -99,7 +104,7 @@ int parse_config(const char *fname)
 	return parse_config_json(jo, config_add, NULL);
 }
 
-int parse_list(struct json_object *jo, bool ipv4, bpc_handle h, void *arg)
+int parse_list(struct json_object *jo, enum peer_list_type plt, bpc_handle h, void *arg)
 {
 	struct json_object *jo_val;
 	struct bfd_peer_cfg bpc;
@@ -107,10 +112,33 @@ int parse_list(struct json_object *jo, bool ipv4, bpc_handle h, void *arg)
 	int error = 0, result;
 
 	allen = json_object_array_length(jo);
-	log_debug("ipv%s peers %d:\n", ipv4 ? "4" : "6", allen);
 	for (idx = 0; idx < allen; idx++) {
 		jo_val = json_object_array_get_idx(jo, idx);
-		result = parse_peer_config(jo_val, &bpc, ipv4);
+
+		/* Set defaults. */
+		memset(&bpc, 0, sizeof(bpc));
+		bpc.bpc_detectmultiplier = BFD_DEFDETECTMULT;
+		bpc.bpc_recvinterval = BFD_DEFREQUIREDMINRX;
+		bpc.bpc_txinterval = BFD_DEFDESIREDMINTX;
+
+		switch (plt) {
+		case PLT_IPV4:
+			log_debug("ipv4 peers %d:\n", allen);
+			bpc.bpc_ipv4 = true;
+			break;
+		case PLT_IPV6:
+			log_debug("ipv6 peers %d:\n", allen);
+			bpc.bpc_ipv4 = false;
+			break;
+
+		default:
+			error++;
+			log_error("%s:%d: unsupported peer type\n",
+				__FUNCTION__, __LINE__);
+			break;
+		}
+
+		result = parse_peer_config(jo_val, &bpc);
 		error += result;
 		if (result == 0)
 			error += (h(&bpc, arg) != 0);
@@ -119,23 +147,15 @@ int parse_list(struct json_object *jo, bool ipv4, bpc_handle h, void *arg)
 	return error;
 }
 
-int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc,
-		      bool ipv4)
+int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 {
 	const char *key, *sval;
 	struct json_object *jo_val;
 	struct json_object_iterator joi, join;
-	int family_type = (ipv4) ? AF_INET : AF_INET6;
+	int family_type = (bpc->bpc_ipv4) ? AF_INET : AF_INET6;
 	int error = 0;
 
-	memset(bpc, 0, sizeof(*bpc));
-	bpc->bpc_ipv4 = ipv4;
-	log_debug("\tpeer: %s\n", ipv4 ? "ipv4" : "ipv6");
-
-	/* Set defaults. */
-	bpc->bpc_detectmultiplier = BFD_DEFDETECTMULT;
-	bpc->bpc_recvinterval = BFD_DEFREQUIREDMINRX;
-	bpc->bpc_txinterval = BFD_DEFDESIREDMINTX;
+	log_debug("\tpeer: %s\n", bpc->bpc_ipv4 ? "ipv4" : "ipv6");
 
 	JSON_FOREACH (jo, joi, join) {
 		key = json_object_iter_peek_name(&joi);
