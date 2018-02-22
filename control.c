@@ -66,6 +66,7 @@ void control_response(struct bfd_control_socket *bcs, uint16_t id,
 
 static void _control_notify_config(struct bfd_control_socket *bcs,
 				   const char *op, bfd_session *bs);
+static void _control_notify(struct bfd_control_socket *bcs, bfd_session *bs);
 
 
 /*
@@ -531,7 +532,24 @@ void control_handle_notify(struct bfd_control_socket *bcs,
 		extern bfd_session *session_hash;
 
 		HASH_ITER (sh, session_hash, bs, tmp) {
+			/* Notify peer configuration. */
 			_control_notify_config(bcs, BCM_NOTIFY_CONFIG_ADD, bs);
+			/* Notify peer status. */
+			_control_notify(bcs, bs);
+		}
+	}
+
+	/*
+	 * If peer asked for notification configuration, send the current
+	 * state to sync.
+	 */
+	if (bcs->bcs_notify & BCM_NOTIFY_PEER_STATE) {
+		bfd_session *bs, *tmp;
+		extern bfd_session *session_hash;
+
+		HASH_ITER (sh, session_hash, bs, tmp) {
+			/* Notify peer status. */
+			_control_notify(bcs, bs);
 		}
 	}
 }
@@ -546,6 +564,9 @@ int notify_add_cb(struct bfd_peer_cfg *bpc, void *arg)
 
 	if (control_notifypeer_new(bcs, bs) == NULL)
 		return -1;
+
+	/* Notify peer status. */
+	_control_notify(bcs, bs);
 
 	return 0;
 }
