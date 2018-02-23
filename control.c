@@ -16,6 +16,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/un.h>
 
 #include <stdio.h>
@@ -75,6 +76,7 @@ static void _control_notify(struct bfd_control_socket *bcs, bfd_session *bs);
 int control_init(void)
 {
 	int sd;
+	mode_t umval;
 	struct sockaddr_un sun = {
 		.sun_family = AF_UNIX, .sun_path = BFD_CONTROL_SOCK_PATH,
 	};
@@ -89,11 +91,13 @@ int control_init(void)
 		return -1;
 	}
 
+	umval = umask(0);
 	if (bind(sd, (struct sockaddr *)&sun, sizeof(sun)) == -1) {
 		log_error("%s: bind: %s\n", __FUNCTION__, strerror(errno));
 		close(sd);
 		return -1;
 	}
+	umask(umval);
 
 	if (listen(sd, SOMAXCONN) == -1) {
 		log_error("%s: listen: %s\n", __FUNCTION__, strerror(errno));
