@@ -13,6 +13,9 @@ CFLAGS	+=	-Wno-implicit-fallthrough
 
 LDFLAGS	+=	-levent -ljson-c
 
+# Enable verbose event debugs
+# CFLAGS += -DBFD_EVENT_DEBUG
+
 .PHONY: all clean
 
 all: ${BIN} ${CTRLBIN}
