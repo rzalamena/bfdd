@@ -139,6 +139,7 @@ int parse_list(struct json_object *jo, enum peer_list_type plt, bpc_handle h, vo
 		case PLT_LABEL:
 			log_debug("label peers %d:\n", allen);
 			if (parse_peer_label_config(jo_val, &bpc) != 0) {
+				error++;
 				continue;
 			}
 			break;
@@ -292,6 +293,8 @@ int parse_peer_label_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 	pl = pl_find(sval);
 	if (pl == NULL)
 		return 1;
+
+	log_debug("\tpeer-label: %s\n", sval);
 
 	/* Translate the label into BFD address keys. */
 	bpc->bpc_ipv4 = !BFD_CHECK_FLAG(pl->pl_bs->flags, BFD_SESS_FLAG_IPV6);
