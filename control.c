@@ -493,9 +493,16 @@ void control_handle_request_del(struct bfd_control_socket *bcs,
 
 static bfd_session *_notify_find_peer(struct bfd_peer_cfg *bpc)
 {
+	struct peer_label *pl;
 	bfd_session *bs;
 	bfd_shop_key shop;
 	bfd_mhop_key mhop;
+
+	if (bpc->bpc_has_label) {
+		pl = pl_find(bpc->bpc_label);
+		if (pl)
+			return pl->pl_bs;
+	}
 
 	memset(&shop, 0, sizeof(shop));
 	if (bpc->bpc_mhop) {
