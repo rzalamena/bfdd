@@ -422,6 +422,10 @@ char *config_notify(bfd_session *bs)
 		}
 	}
 
+	if (bs->pl) {
+		json_object_add_string(resp, "label", bs->pl->pl_label);
+	}
+
 	/* Add status information */
 	json_object_add_int(resp, "id", bs->discrs.my_discr);
 	json_object_add_int(resp, "remote-id", bs->discrs.my_discr);
