@@ -376,7 +376,7 @@ char *config_response(const char *status, const char *error)
 
 	/* Generate JSON response. */
 	jsonstr = strdup(
-		json_object_to_json_string_ext(resp, JSON_C_TO_STRING_PRETTY));
+		json_object_to_json_string_ext(resp, BFDD_JSON_CONV_OPTIONS));
 	json_object_put(resp);
 
 	return jsonstr;
@@ -447,7 +447,7 @@ char *config_notify(bfd_session *bs)
 
 	/* Generate JSON response. */
 	jsonstr = strdup(
-		json_object_to_json_string_ext(resp, JSON_C_TO_STRING_PRETTY));
+		json_object_to_json_string_ext(resp, BFDD_JSON_CONV_OPTIONS));
 	json_object_put(resp);
 
 	return jsonstr;
@@ -512,7 +512,7 @@ char *config_notify_config(const char *op, bfd_session *bs)
 skip_config:
 	/* Generate JSON response. */
 	jsonstr = strdup(
-		json_object_to_json_string_ext(resp, JSON_C_TO_STRING_PRETTY));
+		json_object_to_json_string_ext(resp, BFDD_JSON_CONV_OPTIONS));
 	json_object_put(resp);
 
 	return jsonstr;

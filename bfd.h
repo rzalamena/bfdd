@@ -25,6 +25,12 @@
 
 #define ETHERNET_ADDRESS_LENGTH 6
 
+#ifdef BFD_DEBUG
+#define BFDD_JSON_CONV_OPTIONS (JSON_C_TO_STRING_PRETTY)
+#else
+#define BFDD_JSON_CONV_OPTIONS (0)
+#endif
+
 typedef struct bfd_timers {
 	uint32_t desired_min_tx;
 	uint32_t required_min_rx;
