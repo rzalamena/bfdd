@@ -242,6 +242,8 @@ skip_json:
 int bcm_recv(struct bfd_control_msg *bcm, void *arg)
 {
 	uint16_t *id = arg;
+	struct json_object *jo;
+	const char *jsonstr;
 
 	if (ntohs(bcm->bcm_id) != *id) {
 		fprintf(stderr, "%s: expected id %d, but got %d\n",
@@ -250,11 +252,25 @@ int bcm_recv(struct bfd_control_msg *bcm, void *arg)
 
 	switch (bcm->bcm_type) {
 	case BMT_RESPONSE:
-		printf("Response:\n%s\n", bcm->bcm_data);
+		jo = json_tokener_parse((const char *)bcm->bcm_data);
+		if (jo == NULL) {
+			printf("Response:\n%s\n", bcm->bcm_data);
+		} else {
+			jsonstr = json_object_to_json_string_ext(jo, JSON_C_TO_STRING_PRETTY);
+			printf("Response:\n%s\n", jsonstr);
+			json_object_put(jo);
+		}
 		break;
 
 	case BMT_NOTIFY:
-		printf("Notification:\n%s\n", bcm->bcm_data);
+		jo = json_tokener_parse((const char *)bcm->bcm_data);
+		if (jo == NULL) {
+			printf("Notification:\n%s\n", bcm->bcm_data);
+		} else {
+			jsonstr = json_object_to_json_string_ext(jo, JSON_C_TO_STRING_PRETTY);
+			printf("Notification:\n%s\n", jsonstr);
+			json_object_put(jo);
+		}
 		break;
 
 	case BMT_NOTIFY_ADD:
