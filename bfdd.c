@@ -34,6 +34,7 @@ void usage(void)
 	fprintf(stderr,
 		"%s: [OPTIONS...]\n"
 		"\t-c - select a configuration file\n"
+		"\t-C unix-socket - configuration socket path\n"
 		"\t-h - show this message\n",
 		__progname);
 
@@ -80,6 +81,7 @@ void bg_init(void)
 int main(int argc, char *argv[])
 {
 	const char *conf = BFDD_DEFAULT_CONFIG;
+	const char *ctl_path = BFD_CONTROL_SOCK_PATH;
 	int opt;
 
 	/* Ignore SIGPIPE on write() failures. */
@@ -88,13 +90,14 @@ int main(int argc, char *argv[])
 	log_init(1, BLOG_DEBUG);
 	bg_init();
 
-	/* Initialize control socket. */
-	control_init();
-
-	while ((opt = getopt(argc, argv, "c:")) != -1) {
+	while ((opt = getopt(argc, argv, "c:C:")) != -1) {
 		switch (opt) {
 		case 'c':
 			conf = optarg;
+			break;
+
+		case 'C':
+			ctl_path = optarg;
 			break;
 
 		default:
@@ -102,6 +105,9 @@ int main(int argc, char *argv[])
 			break;
 		}
 	}
+
+	/* Initialize control socket. */
+	control_init(ctl_path);
 
 	parse_config(conf);
 

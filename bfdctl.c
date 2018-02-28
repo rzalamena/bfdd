@@ -33,7 +33,7 @@
  */
 void usage(void);
 
-int control_init(void);
+int control_init(const char *path);
 uint16_t control_send(int sd, enum bc_msg_type bmt, const void *data,
 		      size_t datalen);
 
@@ -57,6 +57,7 @@ void usage(void)
 
 	fprintf(stderr,
 		"%s: [OPTIONS...]\n"
+		"\t-C: control socket path\n"
 		"\t-M: monitor (show notifications for all peers or a specific)\n"
 		"\t-a: add peer\n"
 		"\t-d: delete peer\n"
@@ -75,6 +76,7 @@ int main(int argc, char *argv[])
 	struct json_object *jo;
 	const char *ifname = NULL;
 	const char *jsonstr = NULL;
+	const char *ctl_path = BFD_CONTROL_SOCK_PATH;
 	enum bc_msg_type bmt = 0;
 	int csock;
 	int opt;
@@ -87,8 +89,12 @@ int main(int argc, char *argv[])
 	memset(&local, 0, sizeof(local));
 	memset(&peer, 0, sizeof(peer));
 
-	while ((opt = getopt(argc, argv, "adi:l:Mmp:v")) != -1) {
+	while ((opt = getopt(argc, argv, "aC:di:l:Mmp:v")) != -1) {
 		switch (opt) {
+		case 'C':
+			ctl_path = optarg;
+			break;
+
 		case 'a':
 			if (bmt != 0) {
 				fprintf(stderr,
@@ -198,7 +204,7 @@ int main(int argc, char *argv[])
 	}
 
 skip_json:
-	if ((csock = control_init()) == -1) {
+	if ((csock = control_init(ctl_path)) == -1) {
 		exit(1);
 	}
 
@@ -371,11 +377,16 @@ void ctrl_add_peer(struct json_object *msg, struct bfd_peer_cfg *bpc)
 /*
  * Control socket
  */
-int control_init(void)
+int control_init(const char *path)
 {
 	struct sockaddr_un sun = {.sun_family = AF_UNIX,
 				  .sun_path = BFD_CONTROL_SOCK_PATH};
 	int sd;
+
+	if (path) {
+		strncpy(sun.sun_path, path, sizeof(sun.sun_path));
+		sun.sun_path[sizeof(sun.sun_path) - 1] = 0;
+	}
 
 	sd = socket(AF_UNIX, SOCK_STREAM, PF_UNSPEC);
 	if (sd == -1) {

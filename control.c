@@ -73,13 +73,17 @@ static void _control_notify(struct bfd_control_socket *bcs, bfd_session *bs);
 /*
  * Functions
  */
-int control_init(void)
+int control_init(const char *path)
 {
 	int sd;
 	mode_t umval;
 	struct sockaddr_un sun = {
 		.sun_family = AF_UNIX, .sun_path = BFD_CONTROL_SOCK_PATH,
 	};
+
+	if (path) {
+		strxcpy(sun.sun_path, path, sizeof(sun.sun_path));
+	}
 
 	/* Remove previously created sockets. */
 	unlink(sun.sun_path);

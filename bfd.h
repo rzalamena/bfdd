@@ -382,7 +382,7 @@ struct bfd_control_socket {
 };
 TAILQ_HEAD(bcslist, bfd_control_socket);
 
-int control_init(void);
+int control_init(const char *path);
 int control_notify(bfd_session *bs);
 int control_notify_config(const char *op, bfd_session *bs);
 
