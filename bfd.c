@@ -27,6 +27,8 @@
 #include <arpa/inet.h>
 #include <sys/ioctl.h>
 
+#include <err.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>

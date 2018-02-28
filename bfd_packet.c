@@ -18,6 +18,11 @@
  * Radhika Mahankali [Radhika@cumulusnetworks.com]
  */
 
+/* XXX: fix compilation error on Ubuntu 16.04 or older. */
+#ifndef _UAPI_IPV6_H
+#define _UAPI_IPV6_H
+#endif /* _UAPI_IPV6_H */
+
 #include <linux/filter.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>

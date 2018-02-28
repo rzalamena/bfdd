@@ -19,6 +19,8 @@
 #include <sys/stat.h>
 #include <sys/un.h>
 
+#include <errno.h>
+#include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
