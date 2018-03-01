@@ -672,12 +672,8 @@ bfd_session *bfd_session_new(int sd)
 	return bs;
 }
 
-int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
+static void _bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 {
-	/* User didn't want to update, return failure. */
-	if (bpc->bpc_createonly)
-		return -1;
-
 	/* TODO: handle `shutdown` gracefully. */
 	if (bpc->bpc_shutdown) {
 		BFD_SET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);
@@ -686,11 +682,11 @@ int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 	}
 
 	if (bpc->bpc_has_txinterval) {
-		bs->up_min_tx = bpc->bpc_txinterval;
+		bs->up_min_tx = bpc->bpc_txinterval * 1000;
 	}
 
 	if (bpc->bpc_has_recvinterval) {
-		bs->timers.required_min_rx = bpc->bpc_recvinterval;
+		bs->timers.required_min_rx = bpc->bpc_recvinterval * 1000;
 	}
 
 	if (bpc->bpc_has_detectmultiplier) {
@@ -725,6 +721,15 @@ int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 				sizeof(bs->pl->pl_label));
 		} while (0);
 	}
+}
+
+int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
+{
+	/* User didn't want to update, return failure. */
+	if (bpc->bpc_createonly)
+		return -1;
+
+	_bfd_session_update(bs, bpc);
 
 	/* TODO add VxLAN support. */
 
@@ -824,12 +829,7 @@ skip_address_lookup:
 		return NULL;
 	}
 
-	if (bpc->bpc_has_label) {
-		if (pl_new(bpc->bpc_label, bfd) == NULL) {
-			log_error("%s:%d: failed to label peer\n", __FUNCTION__,
-				  __LINE__);
-		}
-	}
+	_bfd_session_update(bfd, bpc);
 
 	if (bpc->bpc_has_localif && !bpc->bpc_mhop) {
 		bfd->ifindex = ptm_bfd_fetch_ifindex(bpc->bpc_localif);

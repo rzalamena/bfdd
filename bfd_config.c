@@ -508,8 +508,9 @@ char *config_notify_config(const char *op, bfd_session *bs)
 
 	json_object_add_int(resp, "detect-multiplier", bs->detect_mult);
 	json_object_add_int(resp, "receive-interval",
-			    bs->timers.required_min_rx);
-	json_object_add_int(resp, "transmit-interval", bs->up_min_tx);
+			    bs->timers.required_min_rx / 1000);
+	json_object_add_int(resp, "transmit-interval",
+			    bs->up_min_tx / 1000);
 	json_object_add_bool(resp, "shutdown",
 			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN));
 
