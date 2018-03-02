@@ -837,8 +837,6 @@ skip_address_lookup:
 		return NULL;
 	}
 
-	_bfd_session_update(bfd, bpc);
-
 	if (bpc->bpc_has_localif && !bpc->bpc_mhop) {
 		bfd->ifindex = ptm_bfd_fetch_ifindex(bpc->bpc_localif);
 		ptm_bfd_fetch_local_mac(bpc->bpc_localif, bfd->local_mac);
@@ -859,6 +857,12 @@ skip_address_lookup:
 	bfd->local_ip = bpc->bpc_local;
 	bfd->timers.desired_min_tx = bfd->up_min_tx;
 	bfd->detect_TO = (bfd->detect_mult * bfd->slow_min_tx);
+
+	/*
+	 * XXX: session update triggers echo start, so we must have our
+	 * discriminator ID set first.
+	 */
+	_bfd_session_update(bfd, bpc);
 
 	/* Use detect_TO first for slow detection, then use recvtimer_update. */
 	bfd_recvtimer_update(bfd);
