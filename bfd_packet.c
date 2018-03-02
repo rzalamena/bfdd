@@ -475,24 +475,29 @@ int ptm_bfd_process_echo_pkt(int s)
 
 	pkt_len = recvfrom(s, rx_pkt, BFD_RX_BUF_LEN, MSG_DONTWAIT,
 			   (struct sockaddr *)&sll, &from_len);
-	if (pkt_len < 0) {
+	if (pkt_len <= 0) {
 		if (errno != EAGAIN)
 			ERRLOG("Error receiving from BFD Echo socket: %s",
 			       strerror(errno));
 		return -1;
 	}
 
-	ep = (bfd_raw_echo_pkt_t *)(rx_pkt + ETH_HDR_LEN);
+	/* Check if we have at least the basic headers to send back. */
+	if (pkt_len < HEADERS_MIN_LEN) {
+		INFOLOG("Received short echo packet");
+		return -1;
+	}
 
+	ep = (bfd_raw_echo_pkt_t *)(rx_pkt + ETH_HDR_LEN);
 	/* if TTL = 255, assume that the received echo packet has
 	 * to be looped back */
 	if (ep->ip.ttl == BFD_TTL_VAL) {
 		return ptm_bfd_echo_loopback((void *)rx_pkt, pkt_len, &sll);
 	}
 
+	/* Packet is too small for us to process */
 	if (pkt_len < BFD_ECHO_PKT_TOT_LEN) {
-		INFOLOG("Received short echo packet from 0x%x",
-			ntohl(ep->ip.saddr));
+		INFOLOG("Received short echo packet");
 		return -1;
 	}
 

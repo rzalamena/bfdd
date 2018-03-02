@@ -119,6 +119,7 @@ typedef struct bfd_echo_pkt_s {
 #define UDP_HDR_LEN 8
 #define ETH_HDR_LEN 14
 #define VXLAN_HDR_LEN 8
+#define HEADERS_MIN_LEN (ETH_HDR_LEN + IP_HDR_LEN + UDP_HDR_LEN)
 #define BFD_ECHO_PKT_TOT_LEN                                                   \
 	((int)(ETH_HDR_LEN + IP_HDR_LEN + UDP_HDR_LEN + BFD_ECHO_PKT_LEN))
 #define BFD_VXLAN_PKT_TOT_LEN                                                  \
