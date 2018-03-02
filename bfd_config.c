@@ -249,6 +249,10 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 			bpc->bpc_shutdown = json_object_get_boolean(jo_val);
 			log_debug("\tshutdown: %s\n",
 				  bpc->bpc_shutdown ? "true" : "false");
+		} else if (strcmp(key, "echo-mode") == 0) {
+			bpc->bpc_echo = json_object_get_boolean(jo_val);
+			log_debug("\tcho-mode: %s\n",
+				  bpc->bpc_echo ? "true" : "false");
 		} else if (strcmp(key, "label") == 0) {
 			bpc->bpc_has_label = true;
 			sval = json_object_get_string(jo_val);
@@ -511,6 +515,8 @@ char *config_notify_config(const char *op, bfd_session *bs)
 			    bs->timers.required_min_rx / 1000);
 	json_object_add_int(resp, "transmit-interval",
 			    bs->up_min_tx / 1000);
+	json_object_add_bool(resp, "echo-mode",
+			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_ECHO));
 	json_object_add_bool(resp, "shutdown",
 			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN));
 

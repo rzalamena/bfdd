@@ -35,6 +35,9 @@
       "_transmit-interval": "optional, defaults to 300 microseconds",
       "transmit-interval": 300,
 
+      "_echo-mode": "optional, defaults to false",
+      "echo-mode": false,
+
       "_shutdown": "optional, defaults to false",
       "shutdown": false
     }

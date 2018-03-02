@@ -674,6 +674,14 @@ bfd_session *bfd_session_new(int sd)
 
 static void _bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 {
+	if (bpc->bpc_echo) {
+		BFD_SET_FLAG(bs->flags, BFD_SESS_FLAG_ECHO);
+		ptm_bfd_echo_start(bs);
+	} else {
+		BFD_UNSET_FLAG(bs->flags, BFD_SESS_FLAG_ECHO);
+		ptm_bfd_echo_stop(bs, 0);
+	}
+
 	/* TODO: handle `shutdown` gracefully. */
 	if (bpc->bpc_shutdown) {
 		BFD_SET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);

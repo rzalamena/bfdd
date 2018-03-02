@@ -728,7 +728,7 @@ void bfd_recv_cb(evutil_socket_t sd, short events __attribute__((unused)),
 {
 	bfd_session *bfd;
 	bfd_pkt_t *cp;
-	bool is_mhop, is_vxlan, echo_support;
+	bool is_mhop, is_vxlan;
 	ssize_t mlen = 0;
 	uint8_t old_state;
 	uint32_t oldEchoXmt_TO, oldXmtTime;
@@ -741,7 +741,7 @@ void bfd_recv_cb(evutil_socket_t sd, short events __attribute__((unused)),
 		return;
 	}
 
-	echo_support = is_mhop = is_vxlan = false;
+	is_mhop = is_vxlan = false;
 	if (sd == bglobal.bg_shop || sd == bglobal.bg_mhop) {
 		is_mhop = sd == bglobal.bg_mhop;
 		mlen = bfd_recv_ipv4(sd, is_mhop, port, sizeof(port), vrfname,
@@ -826,15 +826,6 @@ strcpy(peer_addr, inet_ntoa(sin.sin_addr));
 
 	bfd->discrs.remote_discr = ntohl(cp->discrs.my_discr);
 
-#if 0 /* TODO get defaults */
-	HASH_FIND(ch, bfd->parm_hash, CLIENT_NAME_DFLT,
-		  strlen(CLIENT_NAME_DFLT), topo_parms);
-
-	if (topo_parms) {
-		echo_support = topo_parms->parms.echo_support;
-	}
-#endif
-
 	/* If received the Final bit, the new values should take effect */
 	if (bfd->polling && BFD_GETFBIT(cp->flags)) {
 		bfd->timers.desired_min_tx = bfd->new_timers.desired_min_tx;
@@ -891,7 +882,7 @@ strcpy(peer_addr, inet_ntoa(sin.sin_addr));
 		     state_list[old_state].str, state_list[bfd->ses_state].str);
 	}
 
-	if (echo_support) {
+	if (BFD_CHECK_FLAG(bfd->flags, BFD_SESS_FLAG_ECHO)) {
 		if (BFD_CHECK_FLAG(bfd->flags, BFD_SESS_FLAG_ECHO_ACTIVE)) {
 			if (!ntohl(cp->timers.required_min_echo)) {
 				ptm_bfd_echo_stop(bfd, 1);

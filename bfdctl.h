@@ -74,6 +74,7 @@ struct bfd_peer_cfg {
 	bool bpc_has_txinterval;
 	uint64_t bpc_txinterval;
 
+	bool bpc_echo;
 	bool bpc_createonly;
 	bool bpc_shutdown;
 
