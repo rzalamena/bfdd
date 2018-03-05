@@ -215,8 +215,10 @@ uint32_t ptm_bfd_gen_ID(void)
 
 void ptm_bfd_start_xmt_timer(bfd_session *bfd, bool is_echo)
 {
-	uint64_t jitter;
+	uint64_t jitter, xmt_TO;
 	int maxpercent;
+
+	xmt_TO = is_echo ? bfd->echo_xmt_TO : bfd->xmt_TO;
 
 	/*
 	 * From section 6.5.2: trasmit interval should be randomly jittered
@@ -226,7 +228,7 @@ void ptm_bfd_start_xmt_timer(bfd_session *bfd, bool is_echo)
 	 * between 75% and 90%.
 	 */
 	maxpercent = (bfd->detect_mult == 1) ? 16 : 26;
-	jitter = (bfd->xmt_TO * (75 + (random() % maxpercent))) / 100;
+	jitter = (xmt_TO * (75 + (random() % maxpercent))) / 100;
 	/* XXX remove that division above */
 
 	if (is_echo)
