@@ -751,10 +751,10 @@ void bfd_session_free(bfd_session *bs)
 	if (bs->sock != -1)
 		close(bs->sock);
 
-	event_del(&bs->recvtimer_ev);
-	event_del(&bs->echo_recvtimer_ev);
-	event_del(&bs->xmttimer_ev);
-	event_del(&bs->echo_xmttimer_ev);
+	bfd_recvtimer_delete(bs);
+	bfd_echo_recvtimer_delete(bs);
+	bfd_xmttimer_delete(bs);
+	bfd_echo_xmttimer_delete(bs);
 
 	HASH_DELETE(sh, session_hash, bs);
 	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
