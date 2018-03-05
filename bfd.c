@@ -687,13 +687,6 @@ static void _bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 		ptm_bfd_echo_stop(bs, 0);
 	}
 
-	/* TODO: handle `shutdown` gracefully. */
-	if (bpc->bpc_shutdown) {
-		BFD_SET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);
-	} else {
-		BFD_UNSET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);
-	}
-
 	if (bpc->bpc_has_txinterval) {
 		bs->up_min_tx = bpc->bpc_txinterval * 1000;
 	}
@@ -733,6 +726,36 @@ static void _bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 			strxcpy(bs->pl->pl_label, bpc->bpc_label,
 				sizeof(bs->pl->pl_label));
 		} while (0);
+	}
+
+	if (bpc->bpc_shutdown) {
+		BFD_SET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);
+
+		/* Disable all events. */
+		bfd_recvtimer_delete(bs);
+		bfd_echo_recvtimer_delete(bs);
+		bfd_xmttimer_delete(bs);
+		bfd_echo_xmttimer_delete(bs);
+
+		/* Change and notify state change. */
+		bs->ses_state = PTM_BFD_ADM_DOWN;
+		control_notify(bs);
+
+		ptm_bfd_snd(bs, 0);
+	} else {
+		BFD_UNSET_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN);
+
+		/* Change and notify state change. */
+		bs->ses_state = PTM_BFD_DOWN;
+		control_notify(bs);
+
+		/* Enable all timers. */
+		bfd_recvtimer_update(bs);
+		bfd_echo_recvtimer_update(bs);
+		if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_ECHO)) {
+			bfd_xmttimer_update(bs, bs->xmt_TO);
+			bfd_echo_xmttimer_update(bs, bs->echo_xmt_TO);
+		}
 	}
 }
 

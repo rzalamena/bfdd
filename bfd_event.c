@@ -30,6 +30,11 @@ void bfd_recvtimer_update(bfd_session *bs)
 {
 	struct timeval tv = {.tv_sec = 0, .tv_usec = bs->detect_TO};
 
+	/* Don't add event if peer is deactivated. */
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN)) {
+		return;
+	}
+
 	tv_normalize(&tv);
 #ifdef BFD_EVENT_DEBUG
 	log_debug("%s: sec = %ld, usec = %ld\n", __FUNCTION__, tv.tv_sec,
@@ -42,6 +47,11 @@ void bfd_recvtimer_update(bfd_session *bs)
 void bfd_echo_recvtimer_update(bfd_session *bs)
 {
 	struct timeval tv = {.tv_sec = 0, .tv_usec = bs->echo_detect_TO};
+
+	/* Don't add event if peer is deactivated. */
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN)) {
+		return;
+	}
 
 	tv_normalize(&tv);
 #ifdef BFD_EVENT_DEBUG
@@ -56,6 +66,11 @@ void bfd_xmttimer_update(bfd_session *bs, uint64_t jitter)
 {
 	struct timeval tv = {.tv_sec = 0, .tv_usec = jitter};
 
+	/* Don't add event if peer is deactivated. */
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN)) {
+		return;
+	}
+
 	tv_normalize(&tv);
 #ifdef BFD_EVENT_DEBUG
 	log_debug("%s: sec = %ld, usec = %ld\n", __FUNCTION__, tv.tv_sec,
@@ -68,6 +83,11 @@ void bfd_xmttimer_update(bfd_session *bs, uint64_t jitter)
 void bfd_echo_xmttimer_update(bfd_session *bs, uint64_t jitter)
 {
 	struct timeval tv = {.tv_sec = 0, .tv_usec = jitter};
+
+	/* Don't add event if peer is deactivated. */
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_SHUTDOWN)) {
+		return;
+	}
 
 	tv_normalize(&tv);
 #ifdef BFD_EVENT_DEBUG
