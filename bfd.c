@@ -679,6 +679,9 @@ static void _bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 	if (bpc->bpc_echo) {
 		BFD_SET_FLAG(bs->flags, BFD_SESS_FLAG_ECHO);
 		ptm_bfd_echo_start(bs);
+
+		/* Activate/update echo receive timeout timer. */
+		bfd_echo_recvtimer_update(bs);
 	} else {
 		BFD_UNSET_FLAG(bs->flags, BFD_SESS_FLAG_ECHO);
 		ptm_bfd_echo_stop(bs, 0);
