@@ -53,6 +53,7 @@ int json_object_add_string(struct json_object *jo, const char *key,
 			   const char *str);
 int json_object_add_bool(struct json_object *jo, const char *key, bool boolean);
 int json_object_add_int(struct json_object *jo, const char *key, int64_t value);
+int json_object_add_peer(struct json_object *jo, bfd_session *bs);
 
 void pl_free(struct peer_label *pl);
 
@@ -397,38 +398,7 @@ char *config_notify(bfd_session *bs)
 
 	json_object_add_string(resp, "op", BCM_NOTIFY_PEER_STATUS);
 
-	/* Add peer 'key' information. */
-	json_object_add_bool(resp, "ipv6",
-			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_IPV6));
-	json_object_add_bool(resp, "multihop",
-			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH));
-	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
-		if (json_object_add_string(resp, "peer-address",
-					   satostr(&bs->mhop.peer))
-		    == -1)
-			return NULL;
-		if (json_object_add_string(resp, "local-address",
-					   satostr(&bs->mhop.local))
-		    == -1)
-			return NULL;
-		if (strlen(bs->mhop.vrf_name) > 0) {
-			json_object_add_string(resp, "vrf-name",
-					       bs->mhop.vrf_name);
-		}
-	} else {
-		if (json_object_add_string(resp, "peer-address",
-					   satostr(&bs->shop.peer))
-		    == -1)
-			return NULL;
-		if (strlen(bs->shop.port_name) > 0) {
-			json_object_add_string(resp, "local-interface",
-					       bs->shop.port_name);
-		}
-	}
-
-	if (bs->pl) {
-		json_object_add_string(resp, "label", bs->pl->pl_label);
-	}
+	json_object_add_peer(resp, bs);
 
 	/* Add status information */
 	json_object_add_int(resp, "id", bs->discrs.my_discr);
@@ -472,38 +442,7 @@ char *config_notify_config(const char *op, bfd_session *bs)
 
 	json_object_add_string(resp, "op", op);
 
-	/* Add peer 'key' information. */
-	json_object_add_bool(resp, "ipv6",
-			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_IPV6));
-	json_object_add_bool(resp, "multihop",
-			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH));
-	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
-		if (json_object_add_string(resp, "peer-address",
-					   satostr(&bs->mhop.peer))
-		    == -1)
-			return NULL;
-		if (json_object_add_string(resp, "local-address",
-					   satostr(&bs->mhop.local))
-		    == -1)
-			return NULL;
-		if (strlen(bs->mhop.vrf_name) > 0) {
-			json_object_add_string(resp, "vrf-name",
-					       bs->mhop.vrf_name);
-		}
-	} else {
-		if (json_object_add_string(resp, "peer-address",
-					   satostr(&bs->shop.peer))
-		    == -1)
-			return NULL;
-		if (strlen(bs->shop.port_name) > 0) {
-			json_object_add_string(resp, "local-interface",
-					       bs->shop.port_name);
-		}
-	}
-
-	if (bs->pl) {
-		json_object_add_string(resp, "label", bs->pl->pl_label);
-	}
+	json_object_add_peer(resp, bs);
 
 	/* On peer deletion we don't need to add any additional information. */
 	if (strcmp(op, BCM_NOTIFY_CONFIG_DELETE) == 0) {
@@ -585,6 +524,41 @@ int json_object_add_int(struct json_object *jo, const char *key, int64_t value)
 	}
 
 	json_object_object_add(jo, key, jon);
+	return 0;
+}
+
+int json_object_add_peer(struct json_object *jo, bfd_session *bs)
+{
+	/* Add peer 'key' information. */
+	json_object_add_bool(jo, "ipv6",
+			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_IPV6));
+	json_object_add_bool(jo, "multihop",
+			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH));
+	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
+		if (json_object_add_string(jo, "peer-address",
+					   satostr(&bs->mhop.peer))
+		    == -1)
+			return -1;
+		if (json_object_add_string(jo, "local-address",
+					   satostr(&bs->mhop.local))
+		    == -1)
+			return -1;
+		if (strlen(bs->mhop.vrf_name) > 0)
+			json_object_add_string(jo, "vrf-name",
+					       bs->mhop.vrf_name);
+	} else {
+		if (json_object_add_string(jo, "peer-address",
+					   satostr(&bs->shop.peer))
+		    == -1)
+			return -1;
+		if (strlen(bs->shop.port_name) > 0)
+			json_object_add_string(jo, "local-interface",
+					       bs->shop.port_name);
+	}
+
+	if (bs->pl)
+		json_object_add_string(jo, "label", bs->pl->pl_label);
+
 	return 0;
 }
 
