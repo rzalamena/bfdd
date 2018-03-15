@@ -885,6 +885,9 @@ strcpy(peer_addr, inet_ntoa(sin.sin_addr));
 		ERRLOG("Unsupport BFD mode detected");
 	}
 
+	/* Save remote diagnostics before state switch. */
+	bfd->remote_diag = cp->diag & BFD_DIAGMASK;
+
 	/* State switch from section 6.8.6 */
 	old_state = bfd->ses_state;
 	if (BFD_GETSTATE(cp->flags) == PTM_BFD_ADM_DOWN) {
@@ -976,6 +979,21 @@ strcpy(peer_addr, inet_ntoa(sin.sin_addr));
 		bfd_recvtimer_update(bfd);
 	} else {
 		ERRLOG("Unsupport BFD mode detected");
+	}
+
+	/*
+	 * Save the timers and state sent by the remote end
+	 * for debugging and statistics.
+	 */
+	if (BFD_GETFBIT(cp->flags)) {
+		bfd->remote_timers.desired_min_tx =
+			ntohl(cp->timers.desired_min_tx);
+		bfd->remote_timers.required_min_rx =
+			ntohl(cp->timers.required_min_rx);
+		bfd->remote_timers.required_min_echo =
+			ntohl(cp->timers.required_min_echo);
+
+		control_notify_config(BCM_NOTIFY_CONFIG_UPDATE, bfd);
 	}
 }
 

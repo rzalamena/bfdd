@@ -29,11 +29,14 @@
       "_detect-multiplier": "optional, defaults to 3",
       "detect-multiplier": 3,
 
-      "_receive-interval": "optional, defaults to 300 microseconds",
+      "_receive-interval": "optional, defaults to 300 milliseconds",
       "receive-interval": 300,
 
-      "_transmit-interval": "optional, defaults to 300 microseconds",
+      "_transmit-interval": "optional, defaults to 300 milliseconds",
       "transmit-interval": 300,
+
+      "_echo-interval": "optional, defaults to 50 milliseconds",
+      "echo-interval": 50,
 
       "_echo-mode": "optional, defaults to false",
       "echo-mode": false,

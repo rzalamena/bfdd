@@ -78,6 +78,7 @@ typedef struct bfd_echo_pkt_s {
 
 /* Macros for manipulating control packets */
 #define BFD_VERMASK 0x03
+#define BFD_DIAGMASK 0x1F
 #define BFD_GETVER(diag) ((diag >> 5) & BFD_VERMASK)
 #define BFD_SETVER(diag, val) ((diag) |= (val & BFD_VERMASK) << 5)
 #define BFD_VERSION 1
@@ -250,6 +251,10 @@ typedef struct ptm_bfd_session {
 
 	struct timeval uptime;   /* last up time */
 	struct timeval downtime; /* last down time */
+
+	/* Remote peer data (for debugging mostly) */
+	uint8_t remote_diag;
+	bfd_timers_t remote_timers;
 
 	uint64_t refcount; /* number of pointers referencing this. */
 } bfd_session;

@@ -127,6 +127,7 @@ int parse_list(struct json_object *jo, enum peer_list_type plt, bpc_handle h, vo
 		bpc.bpc_detectmultiplier = BFD_DEFDETECTMULT;
 		bpc.bpc_recvinterval = BFD_DEFREQUIREDMINRX;
 		bpc.bpc_txinterval = BFD_DEFDESIREDMINTX;
+		bpc.bpc_echointerval = BFD_DEF_REQ_MIN_ECHO;
 
 		switch (plt) {
 		case PLT_IPV4:
@@ -242,6 +243,11 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 			bpc->bpc_has_txinterval = true;
 			log_debug("\ttransmit-interval: %llu\n",
 				  bpc->bpc_txinterval);
+		} else if (strcmp(key, "echo-interval") == 0) {
+			bpc->bpc_echointerval = json_object_get_int64(jo_val);
+			bpc->bpc_has_echointerval = true;
+			log_debug("\techo-interval: %llu\n",
+				  bpc->bpc_echointerval);
 		} else if (strcmp(key, "create-only") == 0) {
 			bpc->bpc_createonly = json_object_get_boolean(jo_val);
 			log_debug("\tcreate-only: %s\n",
@@ -391,6 +397,7 @@ char *config_notify(bfd_session *bs)
 {
 	struct json_object *resp;
 	char *jsonstr;
+	time_t now;
 
 	resp = json_object_new_object();
 	if (resp == NULL)
@@ -407,12 +414,19 @@ char *config_notify(bfd_session *bs)
 	switch (bs->ses_state) {
 	case PTM_BFD_UP:
 		json_object_add_string(resp, "state", "up");
+
+		now = get_monotime(NULL);
+		json_object_add_int(resp, "uptime", now - bs->uptime.tv_sec);
 		break;
 	case PTM_BFD_ADM_DOWN:
 		json_object_add_string(resp, "state", "adm-down");
 		break;
 	case PTM_BFD_DOWN:
 		json_object_add_string(resp, "state", "down");
+
+		now = get_monotime(NULL);
+		json_object_add_int(resp, "downtime",
+				    now - bs->downtime.tv_sec);
 		break;
 	case PTM_BFD_INIT:
 		json_object_add_string(resp, "state", "init");
@@ -422,6 +436,9 @@ char *config_notify(bfd_session *bs)
 		json_object_add_string(resp, "state", "unknown");
 		break;
 	}
+
+	json_object_add_int(resp, "diagnostics", bs->local_diag);
+	json_object_add_int(resp, "remote-diagnostics", bs->remote_diag);
 
 	/* Generate JSON response. */
 	jsonstr = strdup(
@@ -454,6 +471,18 @@ char *config_notify_config(const char *op, bfd_session *bs)
 			    bs->timers.required_min_rx / 1000);
 	json_object_add_int(resp, "transmit-interval",
 			    bs->up_min_tx / 1000);
+	json_object_add_int(resp, "echo-interval",
+			    bs->timers.required_min_echo / 1000);
+
+	json_object_add_int(resp, "remote-detect-multiplier",
+			    bs->remote_detect_mult);
+	json_object_add_int(resp, "remote-receive-interval",
+			    bs->remote_timers.required_min_rx / 1000);
+	json_object_add_int(resp, "remote-transmit-interval",
+			    bs->remote_timers.desired_min_tx / 1000);
+	json_object_add_int(resp, "remote-echo-interval",
+			    bs->remote_timers.required_min_echo / 1000);
+
 	json_object_add_bool(resp, "echo-mode",
 			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_ECHO));
 	json_object_add_bool(resp, "shutdown",

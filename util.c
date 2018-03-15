@@ -90,8 +90,10 @@ time_t get_monotime(struct timeval *tv)
 		return 0;
 	}
 
-	tv->tv_sec = ts.tv_sec;
-	tv->tv_usec = ts.tv_nsec / 1000;
+	if (tv) {
+		tv->tv_sec = ts.tv_sec;
+		tv->tv_usec = ts.tv_nsec / 1000;
+	}
 
-	return tv->tv_sec;
+	return ts.tv_sec;
 }
