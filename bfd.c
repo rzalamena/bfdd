@@ -699,6 +699,9 @@ static void _bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 		bs->detect_mult = bpc->bpc_detectmultiplier;
 	}
 
+	if (bpc->bpc_has_echointerval)
+		bs->timers.required_min_echo = bpc->bpc_echointerval * 1000;
+
 	if (bpc->bpc_has_label) {
 		do {
 			/* Check for new label installation */

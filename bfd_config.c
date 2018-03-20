@@ -258,7 +258,7 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 				  bpc->bpc_shutdown ? "true" : "false");
 		} else if (strcmp(key, "echo-mode") == 0) {
 			bpc->bpc_echo = json_object_get_boolean(jo_val);
-			log_debug("\tcho-mode: %s\n",
+			log_debug("\techo-mode: %s\n",
 				  bpc->bpc_echo ? "true" : "false");
 		} else if (strcmp(key, "label") == 0) {
 			bpc->bpc_has_label = true;
