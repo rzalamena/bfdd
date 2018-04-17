@@ -755,10 +755,10 @@ static void _bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc)
 		/* Enable all timers. */
 		bfd_recvtimer_update(bs);
 		bfd_echo_recvtimer_update(bs);
-		if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_ECHO)) {
-			bfd_xmttimer_update(bs, bs->xmt_TO);
+
+		bfd_xmttimer_update(bs, bs->xmt_TO);
+		if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_ECHO))
 			bfd_echo_xmttimer_update(bs, bs->echo_xmt_TO);
-		}
 	}
 }
 
