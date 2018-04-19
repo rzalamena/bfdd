@@ -206,7 +206,6 @@ typedef struct ptm_bfd_session {
 	/* Timers */
 	bfd_timers_t timers;
 	bfd_timers_t new_timers;
-	uint32_t slow_min_tx;
 	uint32_t up_min_tx;
 	uint64_t detect_TO;
 	struct event echo_recvtimer_ev;

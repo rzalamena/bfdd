@@ -278,7 +278,7 @@ void ptm_bfd_echo_start(bfd_session *bfd)
 	ptm_bfd_echo_xmt_TO(bfd);
 
 	bfd->polling = 1;
-	bfd->new_timers.desired_min_tx = bfd->slow_min_tx;
+	bfd->new_timers.desired_min_tx = bfd->up_min_tx;
 	bfd->new_timers.required_min_rx = bfd->timers.required_min_rx;
 	ptm_bfd_snd(bfd, 0);
 }
@@ -661,7 +661,6 @@ bfd_session *bfd_session_new(int sd)
 	bs->timers.required_min_rx = BFD_DEFREQUIREDMINRX;
 	bs->timers.required_min_echo = BFD_DEF_REQ_MIN_ECHO;
 	bs->detect_mult = BFD_DEFDETECTMULT;
-	bs->slow_min_tx = BFD_DEF_SLOWTX;
 	bs->mh_ttl = BFD_DEF_MHOP_TTL;
 
 	bfd_recvtimer_assign(bs, bfd_recvtimer_cb, sd);
@@ -887,7 +886,7 @@ skip_address_lookup:
 	bfd->discrs.remote_discr = 0;
 	bfd->local_ip = bpc->bpc_local;
 	bfd->timers.desired_min_tx = bfd->up_min_tx;
-	bfd->detect_TO = (bfd->detect_mult * bfd->slow_min_tx);
+	bfd->detect_TO = (bfd->detect_mult * BFD_DEF_SLOWTX);
 
 	/*
 	 * XXX: session update triggers echo start, so we must have our
@@ -936,7 +935,7 @@ skip_address_lookup:
 #endif
 
 	/* Start transmitting with slow interval until peer responds */
-	bfd->xmt_TO = bfd->slow_min_tx;
+	bfd->xmt_TO = BFD_DEF_SLOWTX;
 
 	ptm_bfd_xmt_TO(bfd, 0);
 
