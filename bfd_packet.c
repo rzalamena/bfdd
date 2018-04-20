@@ -566,7 +566,7 @@ void ptm_bfd_snd(bfd_session *bfd, int fbit)
 	cp.timers.required_min_echo = htonl(bfd->timers.required_min_echo);
 
 	if (_ptm_bfd_send(bfd, false, NULL, &cp, BFD_PKT_LEN) != 0) {
-		ERRLOG("Error sending IPv6 control pkt: %s", strerror(errno));
+		ERRLOG("Error sending control pkt: %s", strerror(errno));
 		return;
 	}
 

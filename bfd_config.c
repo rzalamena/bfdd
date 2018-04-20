@@ -193,7 +193,7 @@ int parse_peer_config(struct json_object *jo, struct bfd_peer_cfg *bpc)
 		} else if (strcmp(key, "local-address") == 0) {
 			sval = json_object_get_string(jo_val);
 			if (strtosa(sval, &bpc->bpc_local) != 0
-			    || bpc->bpc_peer.sa_sin.sin_family != family_type) {
+			    || bpc->bpc_local.sa_sin.sin_family != family_type) {
 				log_info(
 					"%s:%d failed to parse local-address '%s'",
 					__FUNCTION__, __LINE__, sval);
