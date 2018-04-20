@@ -700,6 +700,7 @@ ssize_t bfd_recv_ipv4(int sd, bool is_mhop, char *port, size_t portlen,
 		} else if (cm->cmsg_type == IP_PKTINFO) {
 			pi = (struct in_pktinfo *)CMSG_DATA(cm);
 			if (pi) {
+				local->sa_sin.sin_family = AF_INET;
 				local->sa_sin.sin_addr = pi->ipi_addr;
 				fetch_portname_from_ifindex(pi->ipi_ifindex,
 							    port, portlen);
@@ -751,6 +752,7 @@ ssize_t bfd_recv_ipv6(int sd, bool is_mhop, char *port, size_t portlen,
 		} else if (cm->cmsg_type == IPV6_2292PKTINFO) {
 			pi6 = (struct in6_pktinfo *)CMSG_DATA(cm);
 			if (pi6) {
+				local->sa_sin.sin_family = AF_INET6;
 				local->sa_sin6.sin6_addr = pi6->ipi6_addr;
 				fetch_portname_from_ifindex(pi6->ipi6_ifindex,
 							    port, portlen);
