@@ -564,22 +564,19 @@ int json_object_add_peer(struct json_object *jo, bfd_session *bs)
 	json_object_add_bool(jo, "multihop",
 			     BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH));
 	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
-		if (json_object_add_string(jo, "peer-address",
-					   satostr(&bs->mhop.peer))
-		    == -1)
-			return -1;
-		if (json_object_add_string(jo, "local-address",
-					   satostr(&bs->mhop.local))
-		    == -1)
-			return -1;
+		json_object_add_string(jo, "peer-address",
+				       satostr(&bs->mhop.peer));
+		json_object_add_string(jo, "local-address",
+				       satostr(&bs->mhop.local));
 		if (strlen(bs->mhop.vrf_name) > 0)
 			json_object_add_string(jo, "vrf-name",
 					       bs->mhop.vrf_name);
 	} else {
-		if (json_object_add_string(jo, "peer-address",
-					   satostr(&bs->shop.peer))
-		    == -1)
-			return -1;
+		json_object_add_string(jo, "peer-address",
+				       satostr(&bs->shop.peer));
+		if (bs->local_ip.sa_sin.sin_family != AF_UNSPEC)
+			json_object_add_string(jo, "local-address",
+					       satostr(&bs->local_ip));
 		if (strlen(bs->shop.port_name) > 0)
 			json_object_add_string(jo, "local-interface",
 					       bs->shop.port_name);
