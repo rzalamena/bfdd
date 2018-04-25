@@ -733,7 +733,7 @@ ssize_t bfd_recv_ipv6(int sd, bool is_mhop, char *port, size_t portlen,
 	}
 
 	/* Get source address */
-	peer->sa_sin6 = *((struct sockaddr_in6 *)(msghdr.msg_name));
+	peer->sa_sin6 = *((struct sockaddr_in6 *)(msghdr6.msg_name));
 
 	/* Get and check TTL */
 	for (cm = CMSG_FIRSTHDR(&msghdr6); cm != NULL;
