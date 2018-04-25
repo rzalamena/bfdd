@@ -617,6 +617,8 @@ bfd_session *bfd_session_new(int sd)
 	bfd_echo_xmttimer_assign(bs, bfd_echo_xmt_cb);
 
 	bs->sock = sd;
+	get_monotime(&bs->uptime);
+	bs->downtime = bs->uptime;
 
 	return bs;
 }
@@ -836,12 +838,6 @@ skip_address_lookup:
 	bfd->timers.desired_min_tx = bfd->up_min_tx;
 	bfd->detect_TO = (bfd->detect_mult * BFD_DEF_SLOWTX);
 
-	/*
-	 * XXX: session update triggers echo start, so we must have our
-	 * discriminator ID set first.
-	 */
-	_bfd_session_update(bfd, bpc);
-
 	/* Use detect_TO first for slow detection, then use recvtimer_update. */
 	bfd_recvtimer_update(bfd);
 
@@ -849,7 +845,6 @@ skip_address_lookup:
 
 	if (bpc->bpc_mhop) {
 		BFD_SET_FLAG(bfd->flags, BFD_SESS_FLAG_MH);
-		bfd->timers.required_min_echo = 0;
 		bfd->mhop.peer = bpc->bpc_peer;
 		bfd->mhop.local = bpc->bpc_local;
 		if (bpc->bpc_has_vrfname)
@@ -881,6 +876,12 @@ skip_address_lookup:
 		     event->rmac);
 	}
 #endif
+
+	/*
+	 * XXX: session update triggers echo start, so we must have our
+	 * discriminator ID set first.
+	 */
+	_bfd_session_update(bfd, bpc);
 
 	/* Start transmitting with slow interval until peer responds */
 	bfd->xmt_TO = BFD_DEF_SLOWTX;
