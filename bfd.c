@@ -40,19 +40,6 @@
 #include "uthash.h"
 #include "bfd.h"
 
-/* sync interval expressed in sec */
-#define PTM_BFD_CLIENT_SYNC_INTERVAL 20
-
-/* sess pend interval expressed in sec */
-#define PTM_BFD_SESS_PEND_INTERVAL 2
-
-#define MAX_CLIENTS 16
-#define CLIENT_NAME_DFLT "ptm"
-#define CLIENT_SEQID_DFLT 255
-#define CLIENT_NAME "client"
-#define CLIENT_SEQ_ID "seqid"
-#define MAX_SESS_PEND_PER_LOOP 16
-
 bfd_diag_str_list diag_list[] = {
 	{.str = "NeighDown", .type = BFD_DIAGNEIGHDOWN},
 	{.str = "DetectTime", .type = BFD_DIAGDETECTTIME},
@@ -70,9 +57,6 @@ bfd_state_str_list state_list[] = {
 
 struct bfd_vrf *vrf_hash = NULL;
 struct bfd_iface *iface_hash = NULL;
-
-struct timespec bfd_tt_epoch;
-uint64_t bfd_epoch_skid = 2000000; /* this is in NS */
 
 bfd_session *session_hash = NULL;    /* Find session from discriminator */
 bfd_session *peer_hash = NULL;       /* Find session from peer address */
@@ -95,6 +79,11 @@ bfd_session *bfd_session_new(int sd);
 bfd_session *bfd_find_disc(struct sockaddr_any *sa, uint32_t ldisc);
 int bfd_session_update(bfd_session *bs, struct bfd_peer_cfg *bpc);
 
+
+/*
+ * Functions
+ */
+
 static char *get_diag_str(int diag)
 {
 	for (int i = 0; diag_list[i].str; i++) {
@@ -103,45 +92,6 @@ static char *get_diag_str(int diag)
 	}
 	return "N/A";
 }
-
-
-/*
- * Debug utilities.
- */
-#ifdef BFDD_DEBUG
-#define ptm_bfd_ses_dump() _ptm_bfd_ses_dump()
-
-static void _ptm_bfd_ses_dump(void)
-{
-	bfd_session *bfd, *tmp;
-
-	DLOG("\n=======\nSessions List");
-	HASH_ITER (sh, session_hash, bfd, tmp) {
-		DLOG("\tsession 0x%x with peer %s", bfd->discrs.my_discr,
-		     satostr(&bfd->shop.peer));
-	}
-	DLOG("\n=======\nSingle-hop peers List");
-	HASH_ITER (ph, peer_hash, bfd, tmp) {
-		DLOG("\tport/peer %s/%s with session 0x%x", bfd->shop.port_name,
-		     satostr(&bfd->shop.peer), bfd->discrs.my_discr);
-	}
-	DLOG("\n=======\nmultihop peers List");
-	HASH_ITER (mh, local_peer_hash, bfd, tmp) {
-		DLOG("\tvrf %s local/peer %s/%s with session 0x%x",
-		     (strlen(bfd->mhop.vrf_name)) ? bfd->mhop.vrf_name : "N/A",
-		     satostr(&bfd->mhop.local), satostr(&bfd->mhop.peer),
-		     bfd->discrs.my_discr);
-	}
-	DLOG("\n=======\n");
-}
-#else
-#define ptm_bfd_ses_dump()
-#endif /* BFDD_DEBUG */
-
-
-/*
- * Functions
- */
 
 bfd_session *bs_session_find(uint32_t discr)
 {
@@ -440,8 +390,6 @@ bfd_session *ptm_bfd_sess_find(bfd_pkt_t *cp, char *port_name,
 	char peer_addr[64];
 	char local_addr[64];
 	char vrf_name_buf[MAXNAMELEN + 1];
-
-	ptm_bfd_ses_dump();
 
 	/* peer, local are in network-byte order */
 	strxcpy(peer_addr, satostr(peer), sizeof(peer_addr));
