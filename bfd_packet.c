@@ -15,10 +15,7 @@
  * with this program; see the file COPYING; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
  *
- * ptm_bfd.[ch] implements the BFD protocol and interacts with
- * other ptm modules
- *
- * Poll Mode is not supported
+ * bfd_packet.c: implements the BFD protocol packet handling.
  *
  * Authors
  * -------

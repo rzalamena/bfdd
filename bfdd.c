@@ -1,12 +1,21 @@
 /*********************************************************************
- * Copyright 2017 Network Device Education Foundation, Inc. ("NetDEF")
+ * Copyright 2017-2018 Network Device Education Foundation, Inc. ("NetDEF")
  *
- * This file is licensed to You under the Eclipse Public License (EPL);
- * You may not use this file except in compliance with the License. You
- * may obtain a copy of the License at
- * http://www.opensource.org/licenses/eclipse-1.0.php
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the Free
+ * Software Foundation; either version 2 of the License, or (at your option)
+ * any later version.
  *
- * bfdd.c implements the BFD daemon
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program; see the file COPYING; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+ *
+ * bfdd.c: implements the BFD daemon code part.
  *
  * Authors
  * -------
