@@ -661,25 +661,24 @@ ssize_t bfd_recv_ipv4(int sd, bool is_mhop, char *port, size_t portlen,
 	struct in_pktinfo *pi = NULL;
 	ssize_t mlen;
 	uint32_t ttl;
+	struct sockaddr_in msgaddr;
+	struct msghdr msghdr;
+	struct iovec iov[1];
+	uint8_t cmsgbuf[255];
 
-    struct sockaddr_in msgaddr;
-    struct msghdr msghdr;
-    struct iovec iov[1];
-    uint8_t cmsgbuf[255];
+	/* Prepare the recvmsg params. */
+	iov[0].iov_base = msgbuf;
+	iov[0].iov_len = sizeof(msgbuf);
 
-    /* Prepare the recvmsg params. */
-    iov[0].iov_base = msgbuf;
-    iov[0].iov_len = sizeof(msgbuf);
+	memset(&msghdr, 0, sizeof(msghdr));
+	msghdr.msg_name = &msgaddr;
+	msghdr.msg_namelen = sizeof(msgaddr);
+	msghdr.msg_iov = iov;
+	msghdr.msg_iovlen = 1;
+	msghdr.msg_control = cmsgbuf;
+	msghdr.msg_controllen = sizeof(cmsgbuf);
 
-    memset(&msghdr, 0, sizeof(msghdr));
-    msghdr.msg_name = &msgaddr;
-    msghdr.msg_namelen = sizeof(msgaddr);
-    msghdr.msg_iov = iov;
-    msghdr.msg_iovlen = 1;
-    msghdr.msg_control = cmsgbuf;
-    msghdr.msg_controllen = sizeof(cmsgbuf);
-
-    /* Sanitize input/output. */
+	/* Sanitize input/output. */
 	memset(port, 0, portlen);
 	memset(vrfname, 0, vrfnamelen);
 	memset(local, 0, sizeof(*local));
@@ -730,25 +729,24 @@ ssize_t bfd_recv_ipv6(int sd, bool is_mhop, char *port, size_t portlen,
 	struct cmsghdr *cm;
 	struct in6_pktinfo *pi6 = NULL;
 	ssize_t mlen;
+	struct sockaddr_in6 msgaddr6;
+	struct msghdr msghdr6;
+	struct iovec iov[1];
+	uint8_t cmsgbuf6[255];
 
-    struct sockaddr_in6 msgaddr6;
-    struct msghdr msghdr6;
-    struct iovec iov[1];
-    uint8_t cmsgbuf6[255];
+	/* Prepare the recvmsg params. */
+	iov[0].iov_base = msgbuf;
+	iov[0].iov_len = sizeof(msgbuf);
 
-    /* Prepare the recvmsg params. */
-    iov[0].iov_base = msgbuf;
-    iov[0].iov_len = sizeof(msgbuf);
+	memset(&msghdr6, 0, sizeof(msghdr6));
+	msghdr6.msg_name = &msgaddr6;
+	msghdr6.msg_namelen = sizeof(msgaddr6);
+	msghdr6.msg_iov = iov;
+	msghdr6.msg_iovlen = 1;
+	msghdr6.msg_control = cmsgbuf6;
+	msghdr6.msg_controllen = sizeof(cmsgbuf6);
 
-    memset(&msghdr6, 0, sizeof(msghdr6));
-    msghdr6.msg_name = &msgaddr6;
-    msghdr6.msg_namelen = sizeof(msgaddr6);
-    msghdr6.msg_iov = iov;
-    msghdr6.msg_iovlen = 1;
-    msghdr6.msg_control = cmsgbuf6;
-    msghdr6.msg_controllen = sizeof(cmsgbuf6);
-
-    /* Sanitize input/output. */
+	/* Sanitize input/output. */
 	memset(port, 0, portlen);
 	memset(vrfname, 0, vrfnamelen);
 	memset(local, 0, sizeof(*local));
