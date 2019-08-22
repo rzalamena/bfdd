@@ -82,18 +82,6 @@ typedef struct vxlan_hdr_s {
 #define UDP_CTRL_PKT_LEN (UDP_HDR_LEN + BFD_PKT_LEN)
 
 static uint8_t msgbuf[BFD_PKT_LEN];
-static struct iovec msgiov = {&(msgbuf[0]), sizeof(msgbuf)};
-static uint8_t cmsgbuf[CMSG_TTL_LEN + CMSG_IN_PKT_INFO_LEN];
-
-static struct sockaddr_in msgaddr;
-static struct msghdr msghdr = {(void *)&msgaddr, sizeof(msgaddr), &msgiov, 1,
-			       (void *)&cmsgbuf, sizeof(cmsgbuf), 0};
-
-static uint8_t cmsgbuf6[CMSG_TTL_LEN + CMSG_IN6_PKT_INFO_LEN];
-
-static struct sockaddr_in6 msgaddr6;
-static struct msghdr msghdr6 = {(void *)&msgaddr6, sizeof(msgaddr6), &msgiov, 1,
-				(void *)&cmsgbuf6, sizeof(cmsgbuf6), 0};
 
 /* Berkeley Packet filter code to filter out BFD Echo packets.
  * tcpdump -dd "(udp dst port 3785)"
@@ -674,6 +662,24 @@ ssize_t bfd_recv_ipv4(int sd, bool is_mhop, char *port, size_t portlen,
 	ssize_t mlen;
 	uint32_t ttl;
 
+    struct sockaddr_in msgaddr;
+    struct msghdr msghdr;
+    struct iovec iov[1];
+    uint8_t cmsgbuf[255];
+
+    /* Prepare the recvmsg params. */
+    iov[0].iov_base = msgbuf;
+    iov[0].iov_len = sizeof(msgbuf);
+
+    memset(&msghdr, 0, sizeof(msghdr));
+    msghdr.msg_name = &msgaddr;
+    msghdr.msg_namelen = sizeof(msgaddr);
+    msghdr.msg_iov = iov;
+    msghdr.msg_iovlen = 1;
+    msghdr.msg_control = cmsgbuf;
+    msghdr.msg_controllen = sizeof(cmsgbuf);
+
+    /* Sanitize input/output. */
 	memset(port, 0, portlen);
 	memset(vrfname, 0, vrfnamelen);
 	memset(local, 0, sizeof(*local));
@@ -725,6 +731,24 @@ ssize_t bfd_recv_ipv6(int sd, bool is_mhop, char *port, size_t portlen,
 	struct in6_pktinfo *pi6 = NULL;
 	ssize_t mlen;
 
+    struct sockaddr_in6 msgaddr6;
+    struct msghdr msghdr6;
+    struct iovec iov[1];
+    uint8_t cmsgbuf6[255];
+
+    /* Prepare the recvmsg params. */
+    iov[0].iov_base = msgbuf;
+    iov[0].iov_len = sizeof(msgbuf);
+
+    memset(&msghdr6, 0, sizeof(msghdr6));
+    msghdr6.msg_name = &msgaddr6;
+    msghdr6.msg_namelen = sizeof(msgaddr6);
+    msghdr6.msg_iov = iov;
+    msghdr6.msg_iovlen = 1;
+    msghdr6.msg_control = cmsgbuf6;
+    msghdr6.msg_controllen = sizeof(cmsgbuf6);
+
+    /* Sanitize input/output. */
 	memset(port, 0, portlen);
 	memset(vrfname, 0, vrfnamelen);
 	memset(local, 0, sizeof(*local));
@@ -752,7 +776,7 @@ ssize_t bfd_recv_ipv6(int sd, bool is_mhop, char *port, size_t portlen,
 			if ((is_mhop == false) && (ttlval != BFD_TTL_VAL)) {
 				INFOLOG("Received pkt with invalid TTL %u from %s flags: %d\n",
 					ttlval, satostr(peer),
-					msghdr.msg_flags);
+					msghdr6.msg_flags);
 				return -1;
 			}
 		} else if (cm->cmsg_type == IPV6_2292PKTINFO) {
@@ -816,7 +840,7 @@ strcpy(peer_addr, inet_ntoa(sin.sin_addr));
 		return;
 	}
 
-	cp = (bfd_pkt_t *)(msghdr.msg_iov->iov_base);
+	cp = (bfd_pkt_t *)(msgbuf);
 	if (BFD_GETVER(cp->diag) != BFD_VERSION) {
 		INFOLOG("Received bad version %d from %s", BFD_GETVER(cp->diag),
 			satostr(&peer));
