@@ -742,6 +742,9 @@ void bfd_session_free(bfd_session *bs)
 	bfd_xmttimer_delete(bs);
 	bfd_echo_xmttimer_delete(bs);
 
+	if (bs->pl != NULL)
+		pl_free(bs->pl);
+
 	HASH_DELETE(sh, session_hash, bs);
 	if (BFD_CHECK_FLAG(bs->flags, BFD_SESS_FLAG_MH)) {
 		HASH_DELETE(mh, local_peer_hash, bs);
