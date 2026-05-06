@@ -445,6 +445,7 @@ int config_notify_request(struct bfd_control_socket *bcs, const char *jsonstr,
 
 struct peer_label *pl_new(const char *label, bfd_session *bs);
 struct peer_label *pl_find(const char *label);
+void pl_free(struct peer_label *pl);
 
 
 /*

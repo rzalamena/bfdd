@@ -64,8 +64,6 @@ int json_object_add_bool(struct json_object *jo, const char *key, bool boolean);
 int json_object_add_int(struct json_object *jo, const char *key, int64_t value);
 int json_object_add_peer(struct json_object *jo, bfd_session *bs);
 
-void pl_free(struct peer_label *pl);
-
 
 /*
  * Implementation
