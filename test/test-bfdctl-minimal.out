@@ -9,9 +9,11 @@ bfdctl: [OPTIONS...]
 	-E <program>: on every event (notification or response to a request) execute:
 	              <program> (Response|Notification) <event json>
 	              instead of printing the JSON to stdout
-	-a: add peer
+	-a: add or update peer
 	-d: delete peer
-	-L <label>: when deleting, find peer by label instead of by address
+	-j <peer json>: custom peer definition json (same syntax as config file)
+	                note: fields set through other options will override fields in the json
+	-L <label>: find peer by label instead of by address (peer must already exist)
 	-i <ifname>: interface
 	-l <address>: local address (e.g. 192.168.0.1 or 2001:db8::100)
 	-m: multihop
