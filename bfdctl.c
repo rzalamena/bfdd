@@ -52,7 +52,8 @@ typedef int (*control_recv_cb)(struct bfd_control_msg *, void *arg);
 int control_recv(int sd, control_recv_cb cb, void *arg);
 
 struct json_object *ctrl_new_json(void);
-void ctrl_add_peer(struct json_object *msg, struct bfd_peer_cfg *bpc);
+void ctrl_add_peer_by_address(struct json_object *msg, struct bfd_peer_cfg *bpc);
+void ctrl_add_peer_by_label(struct json_object *msg, struct bfd_peer_cfg *bpc);
 
 int bcm_recv(struct bfd_control_msg *bcm, void *arg);
 const char *satostr(struct sockaddr_any *sa);
@@ -72,6 +73,7 @@ void usage(void)
 		"\t-M: monitor (show notifications for all peers or a specific)\n"
 		"\t-a: add peer\n"
 		"\t-d: delete peer\n"
+		"\t-L <label>: when deleting, find peer by label instead of by address\n"
 		"\t-i <ifname>: interface\n"
 		"\t-l <address>: local address (e.g. 192.168.0.1 or 2001:db8::100)\n"
 		"\t-m: multihop\n"
@@ -87,13 +89,14 @@ int main(int argc, char *argv[])
 	struct json_object *jo;
 	const char *ifname = NULL;
 	const char *jsonstr = NULL;
+	const char *label = NULL;
 	const char *ctl_path = BFD_CONTROL_SOCK_PATH;
 	enum bc_msg_type bmt = 0;
 	int csock;
 	int opt;
 	uint16_t cur_id;
 	bool mhop = false, verbose = false, monitor = false;
-	bool update_by_address = false;
+	bool update_by_address = false, update_by_label = false;
 	struct sockaddr_any local, peer;
 	struct bfd_peer_cfg bpc;
 	uint64_t notify_flags = BCM_NOTIFY_ALL;
@@ -102,7 +105,7 @@ int main(int argc, char *argv[])
 	memset(&peer, 0, sizeof(peer));
 	memset(&bpc, 0, sizeof(bpc));
 
-	while ((opt = getopt(argc, argv, "aC:di:l:Mmp:v")) != -1) {
+	while ((opt = getopt(argc, argv, "aC:di:l:L:Mmp:v")) != -1) {
 		switch (opt) {
 		case 'C':
 			ctl_path = optarg;
@@ -148,6 +151,17 @@ int main(int argc, char *argv[])
 			update_by_address = true;
 			break;
 
+		case 'L':
+			label = optarg;
+			if (strlen(label) > MAXLABELLEN) {
+				fprintf(stderr,
+					"Label name too long (expected < %d, got %zd)\n",
+					MAXLABELLEN, strlen(label));
+				exit(1);
+			}
+			update_by_label = true;
+			break;
+
 		case 'p':
 			if (strtosa(optarg, &peer) != 0) {
 				fprintf(stderr, "wrong address format: %s\n",
@@ -182,7 +196,7 @@ int main(int argc, char *argv[])
 	}
 
 #if BFDCTL_BACKWARDS_COMPAT
-	if (peer.sa_sin.sin_family == 0 && monitor && bmt == 0) {
+	if (peer.sa_sin.sin_family == 0 && !update_by_label && monitor && bmt == 0) {
 		/*
 		 * Historically, when passing `-M` but no `-p`,
 		 * other options related to peer addres
@@ -204,12 +218,18 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	if (!update_by_address) {
+	if (!update_by_address && !update_by_label) {
 		if (bmt == 0) {
 			goto skip_json;
 		}
 
-		fprintf(stderr, "you must specify a remote peer\n");
+		fprintf(stderr, "you must specify a remote peer or label\n");
+		exit(1);
+	}
+
+	if (update_by_address && update_by_label) {
+		fprintf(stderr, "cannot use select-by-address options (-p/-i/-l/-m) "
+			"when selecting peer by label\n");
 		exit(1);
 	}
 
@@ -227,23 +247,35 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* Fill the BFD peer configuration */
-	bpc.bpc_mhop = mhop;
-	if (ifname) {
-		bpc.bpc_has_localif = true;
-		strcpy(bpc.bpc_localif, ifname);
+	/* Fill the BFD peer configuration and convert it to JSON object */
+	jo = ctrl_new_json();
+
+	if (update_by_address) {
+		bpc.bpc_mhop = mhop;
+		if (ifname) {
+			bpc.bpc_has_localif = true;
+			strcpy(bpc.bpc_localif, ifname);
+		}
+
+		if (peer.sa_sin.sin_family == AF_INET)
+			bpc.bpc_ipv4 = true;
+
+		bpc.bpc_peer = peer;
+		bpc.bpc_local = local;
+
+		ctrl_add_peer_by_address(jo, &bpc);
 	}
 
-	if (peer.sa_sin.sin_family == AF_INET)
-		bpc.bpc_ipv4 = true;
+	if (update_by_label) {
+		if (label) {
+			bpc.bpc_has_label = true;
+			strcpy(bpc.bpc_label, label);
+		}
 
-	bpc.bpc_peer = peer;
-	bpc.bpc_local = local;
+		ctrl_add_peer_by_label(jo, &bpc);
+	}
 
 	/* Create the JSON string. */
-	jo = ctrl_new_json();
-	ctrl_add_peer(jo, &bpc);
-
 	jsonstr = json_object_to_json_string_ext(jo, JSON_C_TO_STRING_PRETTY);
 	if (verbose) {
 		fprintf(stderr, "%s\n", jsonstr);
@@ -370,10 +402,38 @@ struct json_object *ctrl_new_json(void)
 	}
 	json_object_object_add(jo, "ipv6", jon);
 
+	/* Create the label list: '{ 'ipv4': [], 'ipv6': [], 'label': [] }' */
+	jon = json_object_new_array();
+	if (jon == NULL) {
+		json_object_put(jo);
+		return NULL;
+	}
+	json_object_object_add(jo, "label", jon);
+
 	return jo;
 }
 
-void ctrl_add_peer(struct json_object *msg, struct bfd_peer_cfg *bpc)
+void ctrl_add_peer_by_label(struct json_object *msg, struct bfd_peer_cfg *bpc) {
+	struct json_object *peer_jo, *jo, *plist;
+
+	peer_jo = json_object_new_object();
+	if (peer_jo == NULL)
+		return;
+
+	if (bpc->bpc_has_label) {
+		jo = json_object_new_string(bpc->bpc_label);
+		if (jo == NULL) {
+			json_object_put(peer_jo);
+			return;
+		}
+		json_object_object_add(peer_jo, "label", jo);
+	}
+
+	json_object_object_get_ex(msg, "label", &plist);
+	json_object_array_add(plist, peer_jo);
+}
+
+void ctrl_add_peer_by_address(struct json_object *msg, struct bfd_peer_cfg *bpc)
 {
 	struct json_object *peer_jo, *jo, *plist;
 

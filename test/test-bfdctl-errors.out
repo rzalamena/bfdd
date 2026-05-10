@@ -17,6 +17,22 @@ you must specify an operation
 
 you must specify an operation
 
+---- ../bfdctl -C bfdd.sock -L foo -p 127.0.0.2
+
+you must specify an operation
+
+---- ../bfdctl -C bfdd.sock -L foo -m -p 127.0.0.2
+
+you must specify an operation
+
+---- ../bfdctl -C bfdd.sock -L foo -m
+
+you must specify an operation
+
+---- ../bfdctl -C bfdd.sock -L foo
+
+you must specify an operation
+
 ======= NO  OP /    MON =======
 
 ---- ../bfdctl -C bfdd.sock -M
@@ -50,11 +66,31 @@ Response:
   "error":"failed to parse notify data"
 }
 
+---- ../bfdctl -C bfdd.sock -M -L foo -p 127.0.0.2
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -M -L foo -m -p 127.0.0.2
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -M -L foo -m
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -M -L foo
+
+Response:
+{
+  "status":"error",
+  "error":"failed to parse notify data"
+}
+
 ======= ADD OP /    MON =======
 
 ---- ../bfdctl -C bfdd.sock -M -a
 
-you must specify a remote peer
+you must specify a remote peer or label
 
 ---- ../bfdctl -C bfdd.sock -M -a -m
 
@@ -100,11 +136,36 @@ Response:
   "status":"ok"
 }
 
+---- ../bfdctl -C bfdd.sock -M -a -L foo -p 127.0.0.2
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -M -a -L foo -m -p 127.0.0.2
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -M -a -L foo -m
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -M -a -L foo
+
+Response:
+{
+  "status":"error",
+  "error":"request add failed"
+}
+Response:
+{
+  "status":"error",
+  "error":"failed to parse notify data"
+}
+
 ======= ADD OP / NO MON =======
 
 ---- ../bfdctl -C bfdd.sock -a
 
-you must specify a remote peer
+you must specify a remote peer or label
 
 ---- ../bfdctl -C bfdd.sock -a -m
 
@@ -123,4 +184,24 @@ Response:
 Response:
 {
   "status":"ok"
+}
+
+---- ../bfdctl -C bfdd.sock -a -L foo -p 127.0.0.2
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -a -L foo -m -p 127.0.0.2
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -a -L foo -m
+
+cannot use select-by-address options (-p/-i/-l/-m) when selecting peer by label
+
+---- ../bfdctl -C bfdd.sock -a -L foo
+
+Response:
+{
+  "status":"error",
+  "error":"request add failed"
 }

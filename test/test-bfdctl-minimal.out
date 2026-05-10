@@ -8,6 +8,7 @@ bfdctl: [OPTIONS...]
 	-M: monitor (show notifications for all peers or a specific)
 	-a: add peer
 	-d: delete peer
+	-L <label>: when deleting, find peer by label instead of by address
 	-i <ifname>: interface
 	-l <address>: local address (e.g. 192.168.0.1 or 2001:db8::100)
 	-m: multihop
