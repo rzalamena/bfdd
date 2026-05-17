@@ -299,6 +299,9 @@ int bcm_recv(struct bfd_control_msg *bcm, void *arg)
 		return -1;
 	}
 
+	// flush stdout after every event, in case we're piped to an event-handling script
+	fflush(stdout);
+
 	return 0;
 }
 
