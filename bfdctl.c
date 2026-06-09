@@ -25,6 +25,7 @@
 
 #include <arpa/inet.h>
 #include <sys/un.h>
+#include <sys/wait.h>
 
 #include <err.h>
 #include <errno.h>
@@ -38,6 +39,15 @@
 #include "bfdctl.h"
 
 #define BFDCTL_BACKWARDS_COMPAT 1
+
+/*
+ * Internal types
+ */
+
+struct bcm_recv_exec_ctx {
+	uint16_t *id_p;
+	char *cmd;
+};
 
 /*
  * Prototypes
@@ -56,6 +66,7 @@ void ctrl_add_peer_by_address(struct json_object *msg, struct bfd_peer_cfg *bpc)
 void ctrl_add_peer_by_label(struct json_object *msg, struct bfd_peer_cfg *bpc);
 
 int bcm_recv(struct bfd_control_msg *bcm, void *arg);
+int bcm_recv_exec(struct bfd_control_msg *bcm, void *arg);
 const char *satostr(struct sockaddr_any *sa);
 int strtosa(const char *addr, struct sockaddr_any *sa);
 
@@ -71,6 +82,9 @@ void usage(void)
 		"%s: [OPTIONS...]\n"
 		"\t-C: control socket path\n"
 		"\t-M: monitor (show notifications for all peers or a specific)\n"
+		"\t-E <program>: on every event (notification or response to a request) execute:\n"
+		"\t              <program> (Response|Notification) <event json>\n"
+		"\t              instead of printing the JSON to stdout\n"
 		"\t-a: add peer\n"
 		"\t-d: delete peer\n"
 		"\t-L <label>: when deleting, find peer by label instead of by address\n"
@@ -91,6 +105,7 @@ int main(int argc, char *argv[])
 	const char *jsonstr = NULL;
 	const char *label = NULL;
 	const char *ctl_path = BFD_CONTROL_SOCK_PATH;
+	char *event_handler = NULL;
 	enum bc_msg_type bmt = 0;
 	int csock;
 	int opt;
@@ -99,13 +114,16 @@ int main(int argc, char *argv[])
 	bool update_by_address = false, update_by_label = false;
 	struct sockaddr_any local, peer;
 	struct bfd_peer_cfg bpc;
+	struct bcm_recv_exec_ctx bre_ctx;
+	control_recv_cb recv_cb;
+	void *recv_cb_arg;
 	uint64_t notify_flags = BCM_NOTIFY_ALL;
 
 	memset(&local, 0, sizeof(local));
 	memset(&peer, 0, sizeof(peer));
 	memset(&bpc, 0, sizeof(bpc));
 
-	while ((opt = getopt(argc, argv, "aC:di:l:L:Mmp:v")) != -1) {
+	while ((opt = getopt(argc, argv, "aC:dE:i:l:L:Mmp:v")) != -1) {
 		switch (opt) {
 		case 'C':
 			ctl_path = optarg;
@@ -129,6 +147,10 @@ int main(int argc, char *argv[])
 				usage();
 			}
 			bmt = BMT_REQUEST_DEL;
+			break;
+
+		case 'E':
+			event_handler = optarg;
 			break;
 
 		case 'i':
@@ -188,6 +210,17 @@ int main(int argc, char *argv[])
 			usage();
 			break;
 		}
+	}
+
+	if (event_handler != NULL) {
+		bre_ctx.id_p = &cur_id;
+		bre_ctx.cmd = event_handler;
+
+		recv_cb = bcm_recv_exec;
+		recv_cb_arg = &bre_ctx;
+	} else {
+		recv_cb = bcm_recv;
+		recv_cb_arg = &cur_id;
 	}
 
 	if (bmt == 0 && !monitor) {
@@ -293,7 +326,7 @@ skip_json:
 			exit(1);
 		}
 
-		control_recv(csock, bcm_recv, &cur_id);
+		control_recv(csock, recv_cb, recv_cb_arg);
 	}
 
 	if (monitor) {
@@ -309,13 +342,13 @@ skip_json:
 			exit(1);
 		}
 
-		control_recv(csock, bcm_recv, &cur_id);
+		control_recv(csock, recv_cb, recv_cb_arg);
 
 		printf("Listening for events\n");
 
 		/* Expect notifications only */
 		cur_id = BCM_NOTIFY_ID;
-		while (control_recv(csock, bcm_recv, &cur_id) == 0) {
+		while (control_recv(csock, recv_cb, recv_cb_arg) == 0) {
 			/* NOTHING */;
 		}
 	}
@@ -381,6 +414,74 @@ int bcm_recv(struct bfd_control_msg *bcm, void *arg)
 	return 0;
 }
 
+static int run_command(char *const argv[]) {
+	const char *prog = argv[0];
+	pid_t pid;
+	int status;
+
+	pid = fork();
+	if (pid < 0) {
+		fprintf(stderr, "%s: failed to fork before running %s: %s",
+		        __FUNCTION__, prog, strerror(errno));
+		return -1;
+	}
+
+	if (pid == 0) {
+		// child
+		execvp(prog, argv);
+		// if we're here, exec failed
+		fprintf(stderr, "%s: failed to execvp %s: %s\n",
+		        __FUNCTION__, prog, strerror(errno));
+		_exit(1);
+	}
+
+	// parent
+	while (waitpid(pid, &status, 0) < 0) {
+		if (errno == EINTR) continue;
+		fprintf(stderr, "%s: failed waitid for %s(%d): %s",
+	                __FUNCTION__, prog, pid, strerror(errno));
+		return -1;
+	}
+
+	if (status != 0) {
+		fprintf(stderr, "%s: child %s(%d) exitted with status: %d",
+		        __FUNCTION__, prog, pid, status);
+		// TODO: try to detect statuses which indicate that prog is broken
+		// and we'll never execute it successfully - return -1 in those cases
+	return 1;
+
+	}
+	return 0;
+}
+
+int bcm_recv_exec(struct bfd_control_msg *bcm, void *arg)
+{
+	struct bcm_recv_exec_ctx *ctx = arg;
+	int ret;
+
+	(void)bcm_check_id(bcm, *ctx->id_p, __FUNCTION__);
+
+	switch (bcm->bcm_type) {
+	case BMT_RESPONSE:
+		ret = run_command(
+			(char *const[]){ctx->cmd, "Response", (char *)bcm->bcm_data, NULL});
+		break;
+	case BMT_NOTIFY:
+		ret = run_command(
+			(char *const[]){ctx->cmd, "Notification", (char *)bcm->bcm_data, NULL});
+		break;
+	case BMT_NOTIFY_ADD:
+	case BMT_NOTIFY_DEL:
+	case BMT_REQUEST_ADD:
+	case BMT_REQUEST_DEL:
+	default:
+		fprintf(stderr, "%s: invalid response type (%d)\n",
+			__FUNCTION__, bcm->bcm_type);
+		return -1;
+	}
+
+	return ret;
+}
 
 /*
  * JSON queries build

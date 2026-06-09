@@ -6,6 +6,9 @@
 bfdctl: [OPTIONS...]
 	-C: control socket path
 	-M: monitor (show notifications for all peers or a specific)
+	-E <program>: on every event (notification or response to a request) execute:
+	              <program> (Response|Notification) <event json>
+	              instead of printing the JSON to stdout
 	-a: add peer
 	-d: delete peer
 	-L <label>: when deleting, find peer by label instead of by address
