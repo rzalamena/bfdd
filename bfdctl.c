@@ -323,16 +323,24 @@ skip_json:
 	return 0;
 }
 
+static int bcm_check_id(const struct bfd_control_msg *bcm, uint16_t id, const char *function)
+{
+	if (ntohs(bcm->bcm_id) != id) {
+		fprintf(stderr, "%s: expected id %d, but got %d\n",
+			function, id, ntohs(bcm->bcm_id));
+		return -1;
+	}
+
+	return 0;
+}
+
 int bcm_recv(struct bfd_control_msg *bcm, void *arg)
 {
 	uint16_t *id = arg;
 	struct json_object *jo;
 	const char *jsonstr;
 
-	if (ntohs(bcm->bcm_id) != *id) {
-		fprintf(stderr, "%s: expected id %d, but got %d\n",
-			__FUNCTION__, *id, ntohs(bcm->bcm_id));
-	}
+	(void)bcm_check_id(bcm, *id, __FUNCTION__);
 
 	switch (bcm->bcm_type) {
 	case BMT_RESPONSE:
