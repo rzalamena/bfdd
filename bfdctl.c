@@ -128,7 +128,7 @@ int main(int argc, char *argv[])
 			ifname = optarg;
 			if (strlen(ifname) > MAXNAMELEN) {
 				fprintf(stderr,
-					"Interface name too long (expected < %d, got %ld)\n",
+					"Interface name too long (expected < %d, got %zd)\n",
 					MAXNAMELEN, strlen(ifname));
 				exit(1);
 			}
