@@ -175,7 +175,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (peer.sa_sin.sin_family == 0) {
-		if (monitor) {
+		if (bmt == 0) {
 			goto skip_json;
 		}
 

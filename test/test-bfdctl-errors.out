@@ -53,11 +53,11 @@ Response:
 
 ---- ../bfdctl -C bfdd.sock -M -a
 
-./test-bfdctl-errors.sh: line 27: 162026 Segmentation fault         (core dumped) "$BFDCTL_BIN" -C "$SOCK" "$@"
+you must specify a remote peer
 
 ---- ../bfdctl -C bfdd.sock -M -a -m
 
-./test-bfdctl-errors.sh: line 28: 162034 Segmentation fault         (core dumped) "$BFDCTL_BIN" -C "$SOCK" "$@"
+you must specify a remote peer
 
 ---- ../bfdctl -C bfdd.sock -M -a -m -p 127.0.0.2
 
