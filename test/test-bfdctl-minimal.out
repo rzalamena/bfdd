@@ -1,0 +1,30 @@
+======= EXECUTABLE CHECK =======
+
+---- ../bfdctl -C bfdd.sock --help
+
+../bfdctl: invalid option -- '-'
+bfdctl: [OPTIONS...]
+	-C: control socket path
+	-M: monitor (show notifications for all peers or a specific)
+	-a: add peer
+	-d: delete peer
+	-i <ifname>: interface
+	-l <address>: local address (e.g. 192.168.0.1 or 2001:db8::100)
+	-m: multihop
+	-p <address>: peer address (e.g. 192.168.0.1 or 2001:db8::100)
+	-v: verbose mode
+======= CONTROL SOCKET CHECK =======
+
+---- ../bfdctl -C bfdd.sock -M
+
+Response:
+{
+  "status":"ok"
+}
+
+---- ../bfdctl -C bfdd.sock -M m
+
+Response:
+{
+  "status":"ok"
+}
