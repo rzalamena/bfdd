@@ -1,0 +1,125 @@
+
+======= NO  OP / NO MON =======
+
+---- ../bfdctl -C bfdd.sock
+
+you must specify an operation
+
+---- ../bfdctl -C bfdd.sock -m
+
+you must specify an operation
+
+---- ../bfdctl -C bfdd.sock -m -p 127.0.0.2
+
+you must specify an operation
+
+---- ../bfdctl -C bfdd.sock -p 127.0.0.2
+
+you must specify an operation
+
+======= NO  OP /    MON =======
+
+---- ../bfdctl -C bfdd.sock -M
+
+Response:
+{
+  "status":"ok"
+}
+
+---- ../bfdctl -C bfdd.sock -M -m
+
+Response:
+{
+  "status":"ok"
+}
+
+---- ../bfdctl -C bfdd.sock -M -m -p 127.0.0.2
+
+Response:
+{
+  "status":"error",
+  "error":"failed to parse notify data"
+}
+
+---- ../bfdctl -C bfdd.sock -M -p 127.0.0.2
+
+Response:
+{
+  "status":"error",
+  "error":"failed to parse notify data"
+}
+
+======= ADD OP /    MON =======
+
+---- ../bfdctl -C bfdd.sock -M -a
+
+./test-bfdctl-errors.sh: line 27: 162026 Segmentation fault         (core dumped) "$BFDCTL_BIN" -C "$SOCK" "$@"
+
+---- ../bfdctl -C bfdd.sock -M -a -m
+
+./test-bfdctl-errors.sh: line 28: 162034 Segmentation fault         (core dumped) "$BFDCTL_BIN" -C "$SOCK" "$@"
+
+---- ../bfdctl -C bfdd.sock -M -a -m -p 127.0.0.2
+
+Response:
+{
+  "status":"error",
+  "error":"request add failed"
+}
+Response:
+{
+  "status":"error",
+  "error":"failed to parse notify data"
+}
+
+---- ../bfdctl -C bfdd.sock -M -a -p 127.0.0.2
+
+Response:
+{
+  "status":"ok"
+}
+bcm_recv: expected id 2, but got 0
+Notification:
+{
+  "op":"status",
+  "ipv6":false,
+  "multihop":false,
+  "peer-address":"127.0.0.2",
+  "id":1,
+  "remote-id":1,
+  "state":"down",
+  "downtime":0,
+  "diagnostics":0,
+  "remote-diagnostics":0
+}
+bcm_recv: expected id 0, but got 2
+Listening for events
+Response:
+{
+  "status":"ok"
+}
+
+======= ADD OP / NO MON =======
+
+---- ../bfdctl -C bfdd.sock -a
+
+you must specify a remote peer
+
+---- ../bfdctl -C bfdd.sock -a -m
+
+you must specify a remote peer
+
+---- ../bfdctl -C bfdd.sock -a -m -p 127.0.0.2
+
+Response:
+{
+  "status":"error",
+  "error":"request add failed"
+}
+
+---- ../bfdctl -C bfdd.sock -a -p 127.0.0.2
+
+Response:
+{
+  "status":"ok"
+}

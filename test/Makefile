@@ -5,7 +5,7 @@ CTRLSOCK = bfdd.sock
 TESTS_OUT = $(addsuffix .out.actual,${TESTS})
 
 COMMON    = Makefile with-server.sh diff.sh common.sh
-TESTS     = test-bfdctl-minimal
+TESTS     = test-bfdctl-minimal test-bfdctl-errors
 
 export CTRLSOCK
 export CTRLBIN
