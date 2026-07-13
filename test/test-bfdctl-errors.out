@@ -28,6 +28,7 @@ Response:
 
 ---- ../bfdctl -C bfdd.sock -M -m
 
+Warning: ignoring select-by-address options (-i/-l/-m) because no peer address was specified. This will be an error in the future.
 Response:
 {
   "status":"ok"
@@ -57,7 +58,7 @@ you must specify a remote peer
 
 ---- ../bfdctl -C bfdd.sock -M -a -m
 
-you must specify a remote peer
+you must specify a remote peer when using any of -i/-l/-m
 
 ---- ../bfdctl -C bfdd.sock -M -a -m -p 127.0.0.2
 
@@ -107,7 +108,7 @@ you must specify a remote peer
 
 ---- ../bfdctl -C bfdd.sock -a -m
 
-you must specify a remote peer
+you must specify a remote peer when using any of -i/-l/-m
 
 ---- ../bfdctl -C bfdd.sock -a -m -p 127.0.0.2
 

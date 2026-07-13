@@ -37,6 +37,8 @@
 
 #include "bfdctl.h"
 
+#define BFDCTL_BACKWARDS_COMPAT 1
+
 /*
  * Prototypes
  */
@@ -91,6 +93,7 @@ int main(int argc, char *argv[])
 	int opt;
 	uint16_t cur_id;
 	bool mhop = false, verbose = false, monitor = false;
+	bool update_by_address = false;
 	struct sockaddr_any local, peer;
 	struct bfd_peer_cfg bpc;
 	uint64_t notify_flags = BCM_NOTIFY_ALL;
@@ -133,6 +136,7 @@ int main(int argc, char *argv[])
 					MAXNAMELEN, strlen(ifname));
 				exit(1);
 			}
+			update_by_address = true;
 			break;
 
 		case 'l':
@@ -141,6 +145,7 @@ int main(int argc, char *argv[])
 					optarg);
 				exit(1);
 			}
+			update_by_address = true;
 			break;
 
 		case 'p':
@@ -149,6 +154,7 @@ int main(int argc, char *argv[])
 					optarg);
 				exit(1);
 			}
+			update_by_address = true;
 			break;
 
 		case 'M':
@@ -157,6 +163,7 @@ int main(int argc, char *argv[])
 
 		case 'm':
 			mhop = true;
+			update_by_address = true;
 			break;
 
 		case 'v':
@@ -174,12 +181,41 @@ int main(int argc, char *argv[])
 		exit(1);
 	}
 
-	if (peer.sa_sin.sin_family == 0) {
+#if BFDCTL_BACKWARDS_COMPAT
+	if (peer.sa_sin.sin_family == 0 && monitor && bmt == 0) {
+		/*
+		 * Historically, when passing `-M` but no `-p`,
+		 * other options related to peer addres
+		 * (multihop, local address, local interface)
+		 * were allowed and simply ignored.
+		 *
+		 * Preserve that behaviour for backwards compatibility.
+		 *
+		 * Passing -M -a or -M -d without -p used to crash,
+		 * so we don't need to preserve that (hence bmt == 0 check above)
+		 */
+		if (update_by_address) {
+			fprintf(stderr,
+				"Warning: ignoring select-by-address options (-i/-l/-m) "
+				"because no peer address was specified. "
+				"This will be an error in the future.\n");
+			update_by_address = false;
+		}
+	}
+#endif
+
+	if (!update_by_address) {
 		if (bmt == 0) {
 			goto skip_json;
 		}
 
 		fprintf(stderr, "you must specify a remote peer\n");
+		exit(1);
+	}
+
+	if (update_by_address && peer.sa_sin.sin_family == 0) {
+		fprintf(stderr, "you must specify a remote peer "
+			"when using any of -i/-l/-m\n");
 		exit(1);
 	}
 
