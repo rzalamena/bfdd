@@ -1,0 +1,36 @@
+======= EXECUTABLE CHECK =======
+
+---- ../bfdctl -C bfdd.sock --help
+
+../bfdctl: invalid option -- '-'
+bfdctl: [OPTIONS...]
+	-C: control socket path
+	-M: monitor (show notifications for all peers or a specific)
+	-E <program>: on every event (notification or response to a request) execute:
+	              <program> (Response|Notification) <event json>
+	              instead of printing the JSON to stdout
+	-a: add or update peer
+	-d: delete peer
+	-j <peer json>: custom peer definition json (same syntax as config file)
+	                note: fields set through other options will override fields in the json
+	-L <label>: find peer by label instead of by address (peer must already exist)
+	-i <ifname>: interface
+	-l <address>: local address (e.g. 192.168.0.1 or 2001:db8::100)
+	-m: multihop
+	-p <address>: peer address (e.g. 192.168.0.1 or 2001:db8::100)
+	-v: verbose mode
+======= CONTROL SOCKET CHECK =======
+
+---- ../bfdctl -C bfdd.sock -M
+
+Response:
+{
+  "status":"ok"
+}
+
+---- ../bfdctl -C bfdd.sock -M m
+
+Response:
+{
+  "status":"ok"
+}

@@ -17,7 +17,7 @@ LDFLAGS +=  -levent -ljson-c
 # Enable verbose event debugs
 # CFLAGS += -DBFD_EVENT_DEBUG
 
-.PHONY: all clean
+.PHONY: all clean test
 
 all: ${BIN} ${CTRLBIN}
 
@@ -30,5 +30,9 @@ ${BIN}: ${OBJS}
 ${CTRLBIN}: bfdctl.c
 	${CC} ${CFLAGS} bfdctl.c -ljson-c -o $@
 
+test: ${BIN} ${CTRLBIN}
+	make -C test test
+
 clean:
 	rm -f -- ${OBJS} ${BIN} ${CTRLBIN}
+	make -C test clean

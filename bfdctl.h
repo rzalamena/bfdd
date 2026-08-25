@@ -44,6 +44,8 @@ struct sockaddr_any {
 #define MAXNAMELEN 32
 #endif
 
+#define MAXLABELLEN (MAXNAMELEN - 1)
+
 #define BPC_DEF_DETECTMULTIPLIER 3
 #define BPC_DEF_RECEIVEINTERVAL 300  /* milliseconds */
 #define BPC_DEF_TRANSMITINTERVAL 300 /* milliseconds */
@@ -64,7 +66,7 @@ struct bfd_peer_cfg {
 	struct sockaddr_any bpc_local;
 
 	bool bpc_has_label;
-	char bpc_label[MAXNAMELEN];
+	char bpc_label[MAXLABELLEN + 1];
 
 	bool bpc_has_vxlan;
 	unsigned int bpc_vxlan;
